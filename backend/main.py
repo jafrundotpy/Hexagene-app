@@ -135,3 +135,12 @@ def dashboard(user=Depends(verify_token)):
         "message": f"Welcome {user['sub']} 🎉",
         "status": "Access granted"
     }
+
+# ✅ Top-level aliases (for frontend compatibility)
+@app.post("/register")
+def register(user: UserSignup):
+    return signup(user)
+
+@app.post("/login")
+def login_alias(user: UserLogin):
+    return login(user)

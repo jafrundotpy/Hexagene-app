@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import API_URL from "../../api/config";
 
 const ApiAccess = () => {
   const [data, setData] = useState(null);
@@ -14,7 +15,7 @@ const ApiAccess = () => {
       }
 
       try {
-        const res = await fetch("http://127.0.0.1:8000/dashboard", {
+        const res = await fetch(`${API_URL}/dashboard`, {
           headers: {
             Authorization: `Bearer ${token}`
           }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./ClinicalAnalysis.css";
+import API_URL from "../../api/config";
 
 const formatName = (message, email) => {
   let targetString = email || message || "";
@@ -32,7 +33,7 @@ const ClinicalAnalysis = () => {
       return;
     }
 
-    fetch("http://127.0.0.1:8000/dashboard", {
+    fetch(`${API_URL}/dashboard`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

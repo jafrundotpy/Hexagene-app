@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./AuthPage.css";
+import API_URL from "../api/config";
 
 const AuthPage = ({ mode = "login" }) => {
   const isLogin = mode === "login";
@@ -21,16 +22,13 @@ const AuthPage = ({ mode = "login" }) => {
     const payload = isLogin ? { email, password } : { name, email, password };
     
     try {
-      console.log(`[DEBUG] Sending ${isLogin ? 'LOGIN' : 'SIGNUP'} request to http://127.0.0.1:8000${endpoint}`);
-      const response = await fetch(`http://127.0.0.1:8000${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      console.log(`[DEBUG] Response received: ${response.status} ${response.statusText}`);
       const data = await response.json();
-      console.log(`[DEBUG] Response payload:`, data);
 
       if (!response.ok) {
         throw new Error(data.detail || "Authentication failed");
@@ -44,8 +42,7 @@ const AuthPage = ({ mode = "login" }) => {
         navigate("/login");
       }
     } catch (err) {
-      console.error("[DEBUG] Network or Authentication Error:", err);
-      setError(err.message);
+      setError(err.message || "Failed to reach server. Please try again.");
     } finally {
       setLoading(false);
     }
