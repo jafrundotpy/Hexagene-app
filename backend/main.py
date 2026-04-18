@@ -15,7 +15,7 @@ app = FastAPI()
 # ✅ CORS FIX (IMPORTANT)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5177", "http://127.0.0.1:5177"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,8 +78,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 # ------------------ ROUTES ------------------
 
 @app.get("/")
-def home():
-    return {"message": "Backend working ✅"}
+def read_root():
+    return {"message": "Backend is running"}
 
 # 🔐 SIGNUP
 @app.post("/auth/signup")
