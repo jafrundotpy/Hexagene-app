@@ -136,56 +136,71 @@ const Simulations = () => {
 
   const handleFileUpload = async (file) => {
     if (!file || !file.type.startsWith("image/")) {
-      setUploadMsg("Please upload an image file.");
+      setUploadMsg("Please upload an image file (JPG, PNG, etc).");
       return;
     }
+
     setUploading(true);
-    setUploadMsg("🔍 Extracting health data from screenshot...");
+    setUploadMsg("🔍 Reading screenshot...");
 
     try {
       const reader = new FileReader();
+
       reader.onload = async (e) => {
-        const base64 = e.target.result.split(",")[1];
+        try {
+          const base64 = e.target.result.split(",")[1];
+          const mediaType = file.type;
 
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 1000,
-            messages: [{
-              role: "user",
-              content: [
-                {
-                  type: "image",
-                  source: { type: "base64", media_type: file.type, data: base64 }
-                },
-                {
-                  type: "text",
-                  text: `Extract health metrics from this wearable app screenshot. Return ONLY a JSON object with these exact keys (use empty string "" if not found):
-                  age, sex, activityLevel, albumin, crp, hba1c, egfr, rdw, uricAcid, restingHR, dailySteps, activeMinutes, vo2max, hrv, recoveryScore, sleepDuration, sleepScore, sleepDebt.
-                  For sex use "M" or "F". All values as strings. No explanation, just JSON.`
-                }
-              ]
-            }]
-          })
-        });
+          setUploadMsg("🧬 Extracting health data with AI...");
 
-        const data = await response.json();
-        const text = data.content?.[0]?.text || "{}";
-        const clean = text.replace(/```json|```/g, "").trim();
-        const extracted = JSON.parse(clean);
+          const response = await fetch("https://hexagene-app.onrender.com/extract-screenshot", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              image_data: base64,
+              media_type: mediaType
+            })
+          });
 
-        setForm((prev) => ({
-          ...prev,
-          ...Object.fromEntries(Object.entries(extracted).filter(([, v]) => v !== ""))
-        }));
-        setUploadMsg("✅ Data extracted successfully! Review and run analysis.");
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || "Extraction failed");
+          }
+
+          const result = await response.json();
+          const extracted = result.data || {};
+
+          const filled = Object.entries(extracted).filter(([, v]) => v !== "" && v !== null && v !== undefined);
+
+          if (filled.length === 0) {
+            setUploadMsg("⚠️ No health data found in screenshot. Try a clearer image or fill manually.");
+            setUploading(false);
+            return;
+          }
+
+          setForm((prev) => ({
+            ...prev,
+            ...Object.fromEntries(filled)
+          }));
+
+          setUploadMsg(`✅ ${filled.length} fields extracted successfully! Review values then click Run Analysis.`);
+          setUploading(false);
+
+        } catch (err) {
+          setUploadMsg(`⚠️ ${err.message || "Could not extract data. Fill inputs manually."}`);
+          setUploading(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setUploadMsg("⚠️ Could not read file. Please try again.");
         setUploading(false);
       };
+
       reader.readAsDataURL(file);
-    } catch {
-      setUploadMsg("⚠️ Could not extract data. Please fill inputs manually.");
+
+    } catch (err) {
+      setUploadMsg("⚠️ Upload failed. Please try again.");
       setUploading(false);
     }
   };
