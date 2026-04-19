@@ -208,4 +208,4 @@ Return ONLY this JSON nothing else no markdown:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) 
