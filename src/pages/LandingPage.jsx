@@ -41,7 +41,7 @@ const LandingPage = () => {
         <div className="hero-cta">
           <button onClick={() => navigate('/signup')} className="btn-primary">Try HexaGene</button>
           <button onClick={() => navigate('/dashboard')} className="btn-outline">Run Clinical Demo</button>
-          <button className="btn-outline">View Dataset</button>
+          <a href="https://zenodo.org/records/18141545" target="_blank" rel="noopener noreferrer" className="btn-outline" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>View Dataset</a>
         </div>
       </section>
 
