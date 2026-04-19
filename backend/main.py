@@ -160,39 +160,60 @@ Return ONLY this exact JSON and nothing else:
 Fill in the values you can see. Leave empty string for anything not visible. Numbers only as strings. No units."""
 
     try:
+        GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+        if not GEMINI_API_KEY:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set on server")
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                },
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+                headers={"Content-Type": "application/json"},
                 json={
-                    "model": "claude-opus-4-5",
-                    "max_tokens": 500,
-                    "messages": [{
-                        "role": "user",
-                        "content": [
+                    "contents": [{
+                        "parts": [
                             {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": media_type,
+                                "inline_data": {
+                                    "mime_type": media_type,
                                     "data": image_data
                                 }
                             },
                             {
-                                "type": "text",
-                                "text": prompt
+                                "text": """Look carefully at every number and label in this health app screenshot. Extract whatever health metrics are visible.
+
+Map what you find to these fields:
+- sleepScore: any sleep score number shown (e.g. 77 points = "77")
+- sleepDuration: if sleep hours shown convert to decimal hours (e.g. 7h 30m = "7.5"), if only score shown leave empty
+- dailySteps: any steps count (e.g. 1,850 steps = "1850")
+- restingHR: resting heart rate in BPM if labeled as resting, else leave empty
+- hrv: heart rate variability in ms (e.g. 53 ms = "53")
+- recoveryScore: any recovery or readiness percentage
+- activeMinutes: active minutes if shown
+- vo2max: VO2 max if shown
+- age: ""
+- sex: ""
+- activityLevel: ""
+- albumin: ""
+- crp: ""
+- hba1c: ""
+- egfr: ""
+- rdw: ""
+- uricAcid: ""
+- sleepDebt: ""
+
+Return ONLY this exact JSON and nothing else, no markdown, no explanation:
+{\"age\":\"\",\"sex\":\"\",\"activityLevel\":\"\",\"albumin\":\"\",\"crp\":\"\",\"hba1c\":\"\",\"egfr\":\"\",\"rdw\":\"\",\"uricAcid\":\"\",\"restingHR\":\"\",\"dailySteps\":\"\",\"activeMinutes\":\"\",\"vo2max\":\"\",\"hrv\":\"\",\"recoveryScore\":\"\",\"sleepDuration\":\"\",\"sleepScore\":\"\",\"sleepDebt\":\"\"}"""
                             }
                         ]
-                    }]
+                    }],
+                    "generationConfig": {
+                        "temperature": 0,
+                        "maxOutputTokens": 500
+                    }
                 }
             )
 
         result = response.json()
-        print("Anthropic raw response:", result)
+        print("Gemini raw response:", result)
 
         if "error" in result:
             error_msg = result["error"].get("message", "Unknown Anthropic error")
