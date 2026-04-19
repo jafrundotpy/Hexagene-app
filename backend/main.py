@@ -25,7 +25,8 @@ app.add_middleware(
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+print(f"[STARTUP] ANTHROPIC_API_KEY loaded: {'YES' if ANTHROPIC_API_KEY else 'NO'}")
 
 if not SECRET_KEY or not ALGORITHM:
     raise ValueError("SECRET_KEY and ALGORITHM must be set in .env")
