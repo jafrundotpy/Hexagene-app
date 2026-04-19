@@ -137,54 +137,60 @@ const Simulations = () => {
   const handleFileUpload = async (file) => {
     if (!file) return;
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadMsg("⚠️ Please upload a JPG, PNG, GIF or WEBP image.");
-      return;
-    }
-
     setUploading(true);
-    setUploadMsg("📸 Reading your screenshot...");
+    setUploadMsg("📸 Reading screenshot...");
 
-    const toBase64 = (file) =>
-      new Promise((resolve, reject) => {
+    try {
+      const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result.split(",")[1]);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
 
-    try {
-      const base64 = await toBase64(file);
+      setUploadMsg("🧬 Extracting health data... please wait up to 30 seconds");
 
-      setUploadMsg("🧬 AI is reading your health data... (this may take 20-40 seconds if server just woke up)");
-
-      const response = await fetch("https://hexagene-app.onrender.com/extract-screenshot", {
+      const res = await fetch("https://hexagene-app.onrender.com/extract-screenshot", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
           image_data: base64,
-          media_type: file.type
+          media_type: file.type || "image/jpeg"
         })
       });
 
-      const result = await response.json();
+      const text = await res.text();
+      console.log("Raw response:", text);
 
-      if (!response.ok) {
-        throw new Error(result.detail || "Extraction failed");
-      }
-
-      const extracted = result.data || {};
-      const filledFields = result.filled_fields || [];
-      const filledCount = result.filled_count || 0;
-
-      if (filledCount === 0) {
-        setUploadMsg("⚠️ No health metrics detected. Make sure the screenshot shows numbers like steps, heart rate, sleep score or HRV.");
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        setUploadMsg("⚠️ Server returned unexpected response. Check console.");
         setUploading(false);
         return;
       }
 
-      setForm((prev) => {
+      if (!res.ok) {
+        setUploadMsg(`⚠️ Error: ${result.detail || "Extraction failed"}`);
+        setUploading(false);
+        return;
+      }
+
+      const extracted = result.data || {};
+      const filledCount = result.filled_count || 0;
+      const filledFields = result.filled_fields || [];
+
+      if (filledCount === 0) {
+        setUploadMsg("⚠️ No data found in screenshot. Make sure numbers are clearly visible.");
+        setUploading(false);
+        return;
+      }
+
+      setForm(prev => {
         const updated = { ...prev };
         Object.entries(extracted).forEach(([key, val]) => {
           if (val !== "" && val !== null && val !== undefined) {
@@ -194,7 +200,7 @@ const Simulations = () => {
         return updated;
       });
 
-      const fieldLabels = {
+      const labelMap = {
         sleepScore: "Sleep Score",
         sleepDuration: "Sleep Duration",
         dailySteps: "Daily Steps",
@@ -207,21 +213,21 @@ const Simulations = () => {
         age: "Age",
         sex: "Sex",
         activityLevel: "Activity Level",
+        albumin: "Albumin",
+        crp: "CRP",
+        hba1c: "HbA1c",
+        egfr: "eGFR",
+        rdw: "RDW",
+        uricAcid: "Uric Acid"
       };
 
-      const detected = filledFields
-        .map((f) => fieldLabels[f] || f)
-        .join(", ");
-
-      setUploadMsg(`✅ Extracted ${filledCount} field${filledCount > 1 ? "s" : ""}: ${detected}. Fill remaining fields manually then click Run Analysis.`);
-      setUploading(false);
+      const names = filledFields.map(f => labelMap[f] || f).join(", ");
+      setUploadMsg(`✅ Got ${filledCount} value${filledCount > 1 ? "s" : ""}: ${names}. Fill rest manually then click Run Analysis.`);
 
     } catch (err) {
-      if (err.message.includes("timed out") || err.message.includes("504")) {
-        setUploadMsg("⏳ Server is waking up. Wait 30 seconds and try uploading again.");
-      } else {
-        setUploadMsg(`⚠️ ${err.message || "Upload failed. Try again."}`);
-      }
+      console.error("Upload error:", err);
+      setUploadMsg(`⚠️ ${err.message || "Upload failed. Try again."}`);
+    } finally {
       setUploading(false);
     }
   };
