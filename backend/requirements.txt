@@ -3,3 +3,4 @@ uvicorn[standard]
 python-dotenv
 passlib[bcrypt]
 python-jose
+httpx
