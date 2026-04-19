@@ -1,23 +1,26 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-import { 
-  Activity, 
-  Binary, 
-  Key, 
-  LineChart, 
-  Settings, 
+import { useAuth } from '../context/AuthContext';
+import {
+  Activity,
+  Binary,
+  Key,
+  LineChart,
+  Settings,
   LogOut
 } from 'lucide-react';
 import './DashboardLayout.css';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const displayName = user?.name || localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'User';
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("userName");
+    logout();
     navigate('/');
   };
 
@@ -26,11 +29,11 @@ const DashboardLayout = () => {
 
       {/* SIDEBAR */}
       <aside className="sidebar">
-        <Logo 
-          className="sidebar-logo" 
-          size={24} 
-          onClick={() => navigate('/')} 
-          style={{ cursor: 'pointer', padding: '2rem', display: 'block' }} 
+        <Logo
+          className="sidebar-logo"
+          size={24}
+          onClick={() => navigate('/')}
+          style={{ cursor: 'pointer', padding: '2rem', display: 'block' }}
         />
 
         <nav className="sidebar-nav">
@@ -61,9 +64,9 @@ const DashboardLayout = () => {
         </nav>
 
         <div className="sidebar-footer">
-          <button 
-            className="nav-item" 
-            onClick={handleLogout} 
+          <button
+            className="nav-item"
+            onClick={handleLogout}
             style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer' }}
           >
             <LogOut size={20} />
@@ -74,23 +77,16 @@ const DashboardLayout = () => {
 
       {/* MAIN AREA */}
       <main className="main-area">
-
         <header className="topbar">
           <div className="user-profile">
-            <div className="user-avatar">
-              {(localStorage.getItem("userName") || localStorage.getItem("userEmail") || "U").charAt(0).toUpperCase()}
-            </div>
-            <span className="user-name">
-              {localStorage.getItem("userName") || localStorage.getItem("userEmail") || "User"}
-            </span>
+            <div className="user-avatar">{avatarLetter}</div>
+            <span className="user-name">{displayName}</span>
           </div>
         </header>
 
-        {/* 🔥 THIS RENDERS CHILD PAGE */}
         <div className="page-content">
           <Outlet />
         </div>
-
       </main>
     </div>
   );

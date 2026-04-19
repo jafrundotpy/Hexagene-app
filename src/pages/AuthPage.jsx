@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import "./AuthPage.css";
 import API_URL from "../api/config";
 
 const AuthPage = ({ mode = "login" }) => {
   const isLogin = mode === "login";
   const navigate = useNavigate();
-  
+  const { login } = useAuth();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,65 +19,61 @@ const AuthPage = ({ mode = "login" }) => {
     e.preventDefault();
     setError("");
 
-    if (!isLogin) {
-      setLoading(true);
-      const endpoint = "/auth/signup";
-      const payload = { name, email, password };
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        const response = await fetch(`${API_URL}${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || "Signup failed");
-        localStorage.setItem("userName", name);
-        navigate("/login");
-      } catch (err) {
-        if (err.name === "AbortError") {
-          setError("Server is waking up, please try again in a few seconds.");
-        } else {
-          setError(err.message || "Failed to reach server.");
-        }
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
     if (!email || !password) {
       setError("Please enter your email and password.");
       return;
     }
 
+    if (!isLogin && !name.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+
     setLoading(true);
+
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      const endpoint = isLogin ? "/auth/login" : "/auth/signup";
+      const payload = isLogin ? { email, password } : { name, email, password };
+
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
+
       clearTimeout(timeout);
       const data = await response.json();
+
       if (response.status === 401) {
         setError("No account found with this email. Please sign up first.");
-        setLoading(false);
         return;
       }
-      if (!response.ok) throw new Error(data.detail || "Login failed");
-      localStorage.setItem("token", data.access_token || data.token);
-      localStorage.setItem("userEmail", email);
-      navigate("/dashboard/analysis", { replace: true });
+
+      if (response.status === 400) {
+        setError(data.detail || "This email is already registered. Please log in.");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Something went wrong.");
+      }
+
+      if (isLogin) {
+        const token = data.access_token || data.token;
+        login({ name: data.name || email.split("@")[0], email }, token);
+        navigate("/dashboard/analysis", { replace: true });
+      } else {
+        localStorage.setItem("pendingName", name);
+        navigate("/login");
+      }
+
     } catch (err) {
       if (err.name === "AbortError") {
-        setError("Server is waking up, please try again in a few seconds.");
+        setError("Server is starting up, please wait a moment and try again.");
       } else {
         setError(err.message || "Failed to reach server. Please try again.");
       }
@@ -93,19 +91,19 @@ const AuthPage = ({ mode = "login" }) => {
               {isLogin ? "Welcome Back" : "Create Account"}
             </h2>
             <p className="auth-subtitle">
-              {isLogin 
-                ? "Enter your credentials to access your dashboard." 
+              {isLogin
+                ? "Enter your credentials to access your dashboard."
                 : "Join us to access premium analytics."}
             </p>
           </div>
-          
+
           {error && (
             <div className="auth-error-banner">
               <span className="error-icon">⚠️</span>
               {error}
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit} className="auth-form">
             {!isLogin && (
               <div className="form-group">
@@ -148,16 +146,12 @@ const AuthPage = ({ mode = "login" }) => {
                 />
               </div>
             </div>
-            
+
             <button type="submit" className="auth-submit-btn" disabled={loading}>
-              {loading ? (
-                <span>Processing...</span>
-              ) : (
-                isLogin ? "Sign In →" : "Get Started →"
-              )}
+              {loading ? <span>Processing...</span> : isLogin ? "Sign In →" : "Get Started →"}
             </button>
           </form>
-          
+
           <div className="auth-toggle">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <Link to={isLogin ? "/signup" : "/login"} className="auth-glow-link">
