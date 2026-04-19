@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+﻿from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -25,8 +25,9 @@ app.add_middleware(
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
-print(f"[STARTUP] ANTHROPIC_API_KEY loaded: {'YES' if ANTHROPIC_API_KEY else 'NO'}")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+print(f"[STARTUP] GEMINI_API_KEY loaded: {'YES' if GEMINI_API_KEY else 'NO - Please add GEMINI_API_KEY in Render environment variables'}")
 
 if not SECRET_KEY or not ALGORITHM:
     raise ValueError("SECRET_KEY and ALGORITHM must be set in .env")
@@ -72,7 +73,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 @app.get("/")
 def read_root():
-    return {"message": "Backend is running"}
+    return {"message": "Backend is running", "gemini_ready": bool(GEMINI_API_KEY)}
 
 @app.post("/auth/signup")
 def signup(user: UserSignup):
@@ -106,10 +107,7 @@ def login(user: UserLogin):
 
 @app.get("/dashboard")
 def dashboard(user=Depends(verify_token)):
-    return {
-        "message": f"Welcome {user['sub']}",
-        "status": "Access granted"
-    }
+    return {"message": f"Welcome {user['sub']}", "status": "Access granted"}
 
 @app.post("/register")
 def register(user: UserSignup):
@@ -127,43 +125,37 @@ async def extract_screenshot(payload: dict):
     if not image_data:
         raise HTTPException(status_code=400, detail="No image data provided")
 
-    if not ANTHROPIC_API_KEY:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set on server. Add it in Render environment variables.")
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set on server. Go to aistudio.google.com/apikey to get a free key and add it in Render environment variables.")
 
-    prompt = """You are looking at a health or fitness app screenshot. Your job is to find every number visible and map it to the correct field.
+    prompt = """Look carefully at every number and label in this health app screenshot. Extract whatever health metrics are visible.
 
-Look for these specific things:
-- Steps count (any number followed by "steps")
-- Sleep score (any score out of 100 related to sleep quality)
-- Sleep duration (hours of sleep, convert to decimal e.g. 7h 24m = 7.4)
-- Heart rate variability HRV in ms
-- Resting heart rate (labeled as resting, not current or latest)
-- Recovery score or readiness score as percentage
-- Active minutes or exercise minutes
-- VO2 Max value
-- Sleep debt in hours
-- Age if shown
-- Sex M or F if shown
-- Activity level 1 to 5 if shown
-- Albumin, CRP, HbA1c, eGFR, RDW, Uric Acid if shown in lab results
+Map what you find to these fields:
+- sleepScore: any sleep score number shown (e.g. 77 points = "77")
+- sleepDuration: sleep hours in decimal (e.g. 7h 30m = "7.5"), leave empty if not shown
+- dailySteps: any steps count (e.g. 1,850 steps = "1850")
+- restingHR: resting heart rate BPM only if labeled as resting
+- hrv: heart rate variability in ms (e.g. 53 ms = "53")
+- recoveryScore: any recovery or readiness percentage
+- activeMinutes: active minutes if shown
+- vo2max: VO2 max if shown
+- age: leave empty
+- sex: leave empty
+- activityLevel: leave empty
+- albumin: leave empty
+- crp: leave empty
+- hba1c: leave empty
+- egfr: leave empty
+- rdw: leave empty
+- uricAcid: leave empty
+- sleepDebt: sleep debt in hours if shown
 
-For this Apple Health screenshot specifically:
-- Sleep Score widget showing points = sleepScore field
-- Steps widget = dailySteps field
-- Heart Rate Variability Average ms = hrv field
-- Resting Heart Rate = restingHR (only if labeled resting)
-- Latest heart rate is NOT resting heart rate, ignore it for restingHR
+Important: Latest heart rate is NOT resting heart rate. Only fill restingHR if it says resting.
 
-Return ONLY this exact JSON and nothing else:
-{"age":"","sex":"","activityLevel":"","albumin":"","crp":"","hba1c":"","egfr":"","rdw":"","uricAcid":"","restingHR":"","dailySteps":"","activeMinutes":"","vo2max":"","hrv":"","recoveryScore":"","sleepDuration":"","sleepScore":"","sleepDebt":""}
-
-Fill in the values you can see. Leave empty string for anything not visible. Numbers only as strings. No units."""
+Return ONLY this JSON nothing else no markdown:
+{"age":"","sex":"","activityLevel":"","albumin":"","crp":"","hba1c":"","egfr":"","rdw":"","uricAcid":"","restingHR":"","dailySteps":"","activeMinutes":"","vo2max":"","hrv":"","recoveryScore":"","sleepDuration":"","sleepScore":"","sleepDebt":""}"""
 
     try:
-        GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-        if not GEMINI_API_KEY:
-            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set on server")
-
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
@@ -177,32 +169,7 @@ Fill in the values you can see. Leave empty string for anything not visible. Num
                                     "data": image_data
                                 }
                             },
-                            {
-                                "text": """Look carefully at every number and label in this health app screenshot. Extract whatever health metrics are visible.
-
-Map what you find to these fields:
-- sleepScore: any sleep score number shown (e.g. 77 points = "77")
-- sleepDuration: if sleep hours shown convert to decimal hours (e.g. 7h 30m = "7.5"), if only score shown leave empty
-- dailySteps: any steps count (e.g. 1,850 steps = "1850")
-- restingHR: resting heart rate in BPM if labeled as resting, else leave empty
-- hrv: heart rate variability in ms (e.g. 53 ms = "53")
-- recoveryScore: any recovery or readiness percentage
-- activeMinutes: active minutes if shown
-- vo2max: VO2 max if shown
-- age: ""
-- sex: ""
-- activityLevel: ""
-- albumin: ""
-- crp: ""
-- hba1c: ""
-- egfr: ""
-- rdw: ""
-- uricAcid: ""
-- sleepDebt: ""
-
-Return ONLY this exact JSON and nothing else, no markdown, no explanation:
-{\"age\":\"\",\"sex\":\"\",\"activityLevel\":\"\",\"albumin\":\"\",\"crp\":\"\",\"hba1c\":\"\",\"egfr\":\"\",\"rdw\":\"\",\"uricAcid\":\"\",\"restingHR\":\"\",\"dailySteps\":\"\",\"activeMinutes\":\"\",\"vo2max\":\"\",\"hrv\":\"\",\"recoveryScore\":\"\",\"sleepDuration\":\"\",\"sleepScore\":\"\",\"sleepDebt\":\"\"}"""
-                            }
+                            {"text": prompt}
                         ]
                     }],
                     "generationConfig": {
@@ -216,15 +183,14 @@ Return ONLY this exact JSON and nothing else, no markdown, no explanation:
         print("Gemini raw response:", result)
 
         if "error" in result:
-            error_msg = result["error"].get("message", "Unknown Anthropic error")
-            raise HTTPException(status_code=500, detail=f"Anthropic API error: {error_msg}")
+            raise HTTPException(status_code=500, detail=f"Gemini error: {result['error'].get('message', 'Unknown error')}")
 
-        text = result.get("content", [{}])[0].get("text", "").strip()
+        text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
         print("Extracted text:", text)
 
         json_match = re.search(r'\{[^{}]+\}', text, re.DOTALL)
         if not json_match:
-            raise HTTPException(status_code=422, detail=f"Could not find JSON in response: {text[:200]}")
+            raise HTTPException(status_code=422, detail=f"No JSON in response: {text[:200]}")
 
         extracted = json.loads(json_match.group(0))
         filled = {k: v for k, v in extracted.items() if v not in ("", None)}
