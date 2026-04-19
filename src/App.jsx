@@ -8,6 +8,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import ClinicalAnalysis from './pages/dashboard/ClinicalAnalysis';
+import Simulations from './pages/dashboard/Simulations';
 import ApiAccess from './pages/dashboard/ApiAccess';
 
 // 🔐 PROTECTED ROUTE (TOKEN BASED)
@@ -84,7 +85,7 @@ function App() {
           <Route path="api" element={<ApiAccess />} />
 
           {/* Extra */}
-          <Route path="simulations" element={<PlaceholderPage title="Simulations" />} />
+          <Route path="simulations" element={<Simulations />} />
           <Route path="usage" element={<PlaceholderPage title="Usage Metrics" />} />
           <Route path="settings" element={<PlaceholderPage title="Settings" />} />
         </Route>
