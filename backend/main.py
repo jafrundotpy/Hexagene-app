@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -88,7 +88,7 @@ async def extract_screenshot(payload: dict):
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             r = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={GEMINI_API_KEY}",
+                f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
                 headers={"Content-Type": "application/json"},
                 json={
                     "contents": [{"parts": [
