@@ -16,33 +16,69 @@ const AuthPage = ({ mode = "login" }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
-    const endpoint = isLogin ? "/auth/login" : "/auth/signup";
-    const payload = isLogin ? { email, password } : { name, email, password };
-    
+    if (!isLogin) {
+      setLoading(true);
+      const endpoint = "/auth/signup";
+      const payload = { name, email, password };
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const response = await fetch(`${API_URL}${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Signup failed");
+        localStorage.setItem("userName", name);
+        navigate("/login");
+      } catch (err) {
+        if (err.name === "AbortError") {
+          setError("Server is waking up, please try again in a few seconds.");
+        } else {
+          setError(err.message || "Failed to reach server.");
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!email || !password) {
+      setError("Please enter your email and password.");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       });
-
+      clearTimeout(timeout);
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Authentication failed");
+      if (response.status === 401) {
+        setError("No account found with this email. Please sign up first.");
+        setLoading(false);
+        return;
       }
-
-      if (isLogin) {
-        localStorage.setItem("token", data.access_token || data.token);
-        localStorage.setItem("userEmail", email);
-        navigate("/dashboard/analysis", { replace: true });
-      } else {
-        navigate("/login");
-      }
+      if (!response.ok) throw new Error(data.detail || "Login failed");
+      localStorage.setItem("token", data.access_token || data.token);
+      localStorage.setItem("userEmail", email);
+      navigate("/dashboard/analysis", { replace: true });
     } catch (err) {
-      setError(err.message || "Failed to reach server. Please try again.");
+      if (err.name === "AbortError") {
+        setError("Server is waking up, please try again in a few seconds.");
+      } else {
+        setError(err.message || "Failed to reach server. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

@@ -15,8 +15,10 @@ const DashboardLayout = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem("token"); // 🔥 IMPORTANT
-    navigate('/login');
+    localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userName");
+    navigate('/');
   };
 
   return (
@@ -28,7 +30,7 @@ const DashboardLayout = () => {
           className="sidebar-logo" 
           size={24} 
           onClick={() => navigate('/')} 
-          style={{ cursor: 'pointer', padding: '2rem' }} 
+          style={{ cursor: 'pointer', padding: '2rem', display: 'block' }} 
         />
 
         <nav className="sidebar-nav">
@@ -75,8 +77,12 @@ const DashboardLayout = () => {
 
         <header className="topbar">
           <div className="user-profile">
-            <div className="user-avatar">AD</div>
-            <span className="user-name">Admin User</span>
+            <div className="user-avatar">
+              {(localStorage.getItem("userName") || localStorage.getItem("userEmail") || "U").charAt(0).toUpperCase()}
+            </div>
+            <span className="user-name">
+              {localStorage.getItem("userName") || localStorage.getItem("userEmail") || "User"}
+            </span>
           </div>
         </header>
 
