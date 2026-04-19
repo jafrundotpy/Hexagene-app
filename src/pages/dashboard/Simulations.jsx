@@ -135,72 +135,93 @@ const Simulations = () => {
   };
 
   const handleFileUpload = async (file) => {
-    if (!file || !file.type.startsWith("image/")) {
-      setUploadMsg("Please upload an image file (JPG, PNG, etc).");
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadMsg("⚠️ Please upload a JPG, PNG, GIF or WEBP image.");
       return;
     }
 
     setUploading(true);
-    setUploadMsg("🔍 Reading screenshot...");
+    setUploadMsg("📸 Reading your screenshot...");
+
+    const toBase64 = (file) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
     try {
-      const reader = new FileReader();
+      const base64 = await toBase64(file);
 
-      reader.onload = async (e) => {
-        try {
-          const base64 = e.target.result.split(",")[1];
-          const mediaType = file.type;
+      setUploadMsg("🧬 AI is reading your health data... (this may take 20-40 seconds if server just woke up)");
 
-          setUploadMsg("🧬 Extracting health data with AI...");
+      const response = await fetch("https://hexagene-app.onrender.com/extract-screenshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image_data: base64,
+          media_type: file.type
+        })
+      });
 
-          const response = await fetch("https://hexagene-app.onrender.com/extract-screenshot", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              image_data: base64,
-              media_type: mediaType
-            })
-          });
+      const result = await response.json();
 
-          if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Extraction failed");
-          }
+      if (!response.ok) {
+        throw new Error(result.detail || "Extraction failed");
+      }
 
-          const result = await response.json();
-          const extracted = result.data || {};
+      const extracted = result.data || {};
+      const filledFields = result.filled_fields || [];
+      const filledCount = result.filled_count || 0;
 
-          const filled = Object.entries(extracted).filter(([, v]) => v !== "" && v !== null && v !== undefined);
-
-          if (filled.length === 0) {
-            setUploadMsg("⚠️ No health data found in screenshot. Try a clearer image or fill manually.");
-            setUploading(false);
-            return;
-          }
-
-          setForm((prev) => ({
-            ...prev,
-            ...Object.fromEntries(filled)
-          }));
-
-          setUploadMsg(`✅ ${filled.length} fields extracted successfully! Review values then click Run Analysis.`);
-          setUploading(false);
-
-        } catch (err) {
-          setUploadMsg(`⚠️ ${err.message || "Could not extract data. Fill inputs manually."}`);
-          setUploading(false);
-        }
-      };
-
-      reader.onerror = () => {
-        setUploadMsg("⚠️ Could not read file. Please try again.");
+      if (filledCount === 0) {
+        setUploadMsg("⚠️ No health metrics detected. Make sure the screenshot shows numbers like steps, heart rate, sleep score or HRV.");
         setUploading(false);
+        return;
+      }
+
+      setForm((prev) => {
+        const updated = { ...prev };
+        Object.entries(extracted).forEach(([key, val]) => {
+          if (val !== "" && val !== null && val !== undefined) {
+            updated[key] = String(val);
+          }
+        });
+        return updated;
+      });
+
+      const fieldLabels = {
+        sleepScore: "Sleep Score",
+        sleepDuration: "Sleep Duration",
+        dailySteps: "Daily Steps",
+        restingHR: "Resting HR",
+        hrv: "HRV",
+        recoveryScore: "Recovery Score",
+        activeMinutes: "Active Minutes",
+        vo2max: "VO2 Max",
+        sleepDebt: "Sleep Debt",
+        age: "Age",
+        sex: "Sex",
+        activityLevel: "Activity Level",
       };
 
-      reader.readAsDataURL(file);
+      const detected = filledFields
+        .map((f) => fieldLabels[f] || f)
+        .join(", ");
+
+      setUploadMsg(`✅ Extracted ${filledCount} field${filledCount > 1 ? "s" : ""}: ${detected}. Fill remaining fields manually then click Run Analysis.`);
+      setUploading(false);
 
     } catch (err) {
-      setUploadMsg("⚠️ Upload failed. Please try again.");
+      if (err.message.includes("timed out") || err.message.includes("504")) {
+        setUploadMsg("⏳ Server is waking up. Wait 30 seconds and try uploading again.");
+      } else {
+        setUploadMsg(`⚠️ ${err.message || "Upload failed. Try again."}`);
+      }
       setUploading(false);
     }
   };

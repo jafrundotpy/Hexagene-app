@@ -150,7 +150,7 @@ async def extract_screenshot(payload: dict):
             raise HTTPException(status_code=400, detail="No image data provided")
 
         if not ANTHROPIC_API_KEY:
-            raise HTTPException(status_code=500, detail="Anthropic API key not configured")
+            raise HTTPException(status_code=500, detail="Anthropic API key not configured on server")
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
@@ -176,19 +176,35 @@ async def extract_screenshot(payload: dict):
                             },
                             {
                                 "type": "text",
-                                "text": """You are a health data extraction expert. Extract ALL health metrics visible in this wearable app screenshot.
-Return ONLY a valid JSON object with these exact keys (use empty string if not visible):
-age, sex, activityLevel, albumin, crp, hba1c, egfr, rdw, uricAcid, restingHR, dailySteps, activeMinutes, vo2max, hrv, recoveryScore, sleepDuration, sleepScore, sleepDebt.
-Rules:
-- sex: use M or F only
-- All numeric values as strings
-- activityLevel: estimate 1-5 from activity data if not explicit
-- restingHR: look for resting heart rate or heart rate
-- dailySteps: look for steps count
-- hrv: look for HRV or heart rate variability
-- sleepDuration: in hours as decimal
-- recoveryScore: look for recovery or readiness score 0-100
-Return ONLY the JSON. No explanation. No markdown."""
+                                "text": """Look carefully at every number and label in this health app screenshot. Extract whatever health metrics are visible.
+
+Map what you find to these fields:
+- sleepScore: any sleep score number shown (e.g. 77 points = \"77\")
+- sleepDuration: if sleep hours shown convert to decimal hours (e.g. 7h 30m = \"7.5\"), if only score shown leave empty
+- dailySteps: any steps count (e.g. 1,850 steps = \"1850\")
+- restingHR: resting heart rate in BPM if labeled as resting, else leave empty
+- hrv: heart rate variability in ms (e.g. 53 ms = \"53\")
+- recoveryScore: any recovery or readiness percentage
+- activeMinutes: active minutes if shown
+- vo2max: VO2 max if shown
+- age: \"\"
+- sex: \"\"
+- activityLevel: \"\"
+- albumin: \"\"
+- crp: \"\"
+- hba1c: \"\"
+- egfr: \"\"
+- rdw: \"\"
+- uricAcid: \"\"
+- sleepDebt: \"\"
+
+Important rules:
+- If heart rate shows \"Latest 122 BPM\" that is NOT resting HR, leave restingHR empty
+- Only extract numbers that are clearly labeled
+- Return ONLY a JSON object, nothing else, no markdown, no explanation
+
+Example output format:
+{"age":"","sex":"","activityLevel":"","albumin":"","crp":"","hba1c":"","egfr":"","rdw":"","uricAcid":"","restingHR":"","dailySteps":"1850","activeMinutes":"","vo2max":"","hrv":"53","recoveryScore":"","sleepDuration":"","sleepScore":"77","sleepDebt":""}"
                             }
                         ]
                     }]
@@ -196,15 +212,35 @@ Return ONLY the JSON. No explanation. No markdown."""
             )
 
         result = response.json()
-        text = result.get("content", [{}])[0].get("text", "{}")
-        clean = text.strip().replace("```json", "").replace("```", "").strip()
+
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=f"Claude API error: {result['error'].get('message','Unknown error')}")
+
+        text = result.get("content", [{}])[0].get("text", "").strip()
 
         import json
-        extracted = json.loads(clean)
-        return {"success": True, "data": extracted}
+        import re
 
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=422, detail="Could not parse extracted data")
+        json_match = re.search(r'\{.*\}', text, re.DOTALL)
+        if not json_match:
+            raise HTTPException(status_code=422, detail="No JSON found in AI response")
+
+        clean = json_match.group(0)
+        extracted = json.loads(clean)
+
+        filled = {k: v for k, v in extracted.items() if v != "" and v is not None}
+
+        return {
+            "success": True,
+            "data": extracted,
+            "filled_count": len(filled),
+            "filled_fields": list(filled.keys())
+        }
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=422, detail=f"JSON parse error: {str(e)}")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="AI extraction timed out. Try again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
