@@ -1,6 +1,4 @@
-﻿Replace the entire content of backend/main.py with this:
-
-from fastapi import FastAPI, HTTPException, Depends
+﻿from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -29,7 +27,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-print(f"[STARTUP] GEMINI_API_KEY loaded: {'YES' if GEMINI_API_KEY else 'NO - Please add GEMINI_API_KEY in Render environment variables'}")
+print(f"[STARTUP] GEMINI_API_KEY loaded: {'YES' if GEMINI_API_KEY else 'NO'}")
 
 if not SECRET_KEY or not ALGORITHM:
     raise ValueError("SECRET_KEY and ALGORITHM must be set in .env")
@@ -78,14 +76,11 @@ def signup(user: UserSignup):
     try:
         if user.email in users_db:
             raise HTTPException(status_code=400, detail="User already exists")
-        users_db[user.email] = {
-            "name": user.name,
-            "password": hash_password(user.password)
-        }
+        users_db[user.email] = {"name": user.name, "password": hash_password(user.password)}
         return {"message": "User created successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Something went wrong")
 
 @app.post("/auth/login")
@@ -100,7 +95,7 @@ def login(user: UserLogin):
         return {"access_token": token, "token_type": "bearer"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Something went wrong")
 
 @app.get("/dashboard")
@@ -124,88 +119,44 @@ async def extract_screenshot(payload: dict):
         raise HTTPException(status_code=400, detail="No image data provided")
 
     if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set on server. Go to aistudio.google.com/apikey to get a free key and add it in Render environment variables.")
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set on server")
 
-    prompt = """Look carefully at every number and label in this health app screenshot. Extract whatever health metrics are visible.
-
-Map what you find to these fields:
-- sleepScore: any sleep score number shown (e.g. 77 points = "77")
-- sleepDuration: sleep hours in decimal (e.g. 7h 30m = "7.5"), leave empty if not shown
-- dailySteps: any steps count (e.g. 1,850 steps = "1850")
-- restingHR: resting heart rate BPM only if labeled as resting
-- hrv: heart rate variability in ms (e.g. 53 ms = "53")
-- recoveryScore: any recovery or readiness percentage
-- activeMinutes: active minutes if shown
-- vo2max: VO2 max if shown
-- age: leave empty
-- sex: leave empty
-- activityLevel: leave empty
-- albumin: leave empty
-- crp: leave empty
-- hba1c: leave empty
-- egfr: leave empty
-- rdw: leave empty
-- uricAcid: leave empty
-- sleepDebt: sleep debt in hours if shown
-
-Important: Latest heart rate is NOT resting heart rate. Only fill restingHR if it says resting.
-
-Return ONLY this JSON nothing else no markdown:
-{"age":"","sex":"","activityLevel":"","albumin":"","crp":"","hba1c":"","egfr":"","rdw":"","uricAcid":"","restingHR":"","dailySteps":"","activeMinutes":"","vo2max":"","hrv":"","recoveryScore":"","sleepDuration":"","sleepScore":"","sleepDebt":""}"""
+    prompt = "Look at this health app screenshot and extract all visible health metrics. Return ONLY a JSON object with these exact keys, no markdown, no explanation: {\"age\":\"\",\"sex\":\"\",\"activityLevel\":\"\",\"albumin\":\"\",\"crp\":\"\",\"hba1c\":\"\",\"egfr\":\"\",\"rdw\":\"\",\"uricAcid\":\"\",\"restingHR\":\"\",\"dailySteps\":\"\",\"activeMinutes\":\"\",\"vo2max\":\"\",\"hrv\":\"\",\"recoveryScore\":\"\",\"sleepDuration\":\"\",\"sleepScore\":\"\",\"sleepDebt\":\"\"}. Rules: sleepScore=any sleep score number. dailySteps=steps count remove commas. hrv=HRV in ms number only. restingHR=resting heart rate only if labeled resting. sleepDuration=hours as decimal. recoveryScore=recovery or readiness percent. Leave empty string if not visible."
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={GEMINI_API_KEY}",
                 headers={"Content-Type": "application/json"},
                 json={
-                    "contents": [{
-                        "parts": [
-                            {
-                                "inline_data": {
-                                    "mime_type": media_type,
-                                    "data": image_data
-                                }
-                            },
-                            {"text": prompt}
-                        ]
-                    }],
-                    "generationConfig": {
-                        "temperature": 0,
-                        "maxOutputTokens": 500
-                    }
+                    "contents": [{"parts": [{"inline_data": {"mime_type": media_type, "data": image_data}}, {"text": prompt}]}],
+                    "generationConfig": {"temperature": 0, "maxOutputTokens": 500}
                 }
             )
 
         result = response.json()
-        print("Gemini raw response:", result)
+        print("Gemini response:", result)
 
         if "error" in result:
-            raise HTTPException(status_code=500, detail=f"Gemini error: {result['error'].get('message', 'Unknown error')}")
+            raise HTTPException(status_code=500, detail=f"Gemini error: {result['error'].get('message','Unknown')}")
 
         text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
-        print("Extracted text:", text)
+        print("Text:", text)
 
         json_match = re.search(r'\{[^{}]+\}', text, re.DOTALL)
         if not json_match:
-            raise HTTPException(status_code=422, detail=f"No JSON in response: {text[:200]}")
+            raise HTTPException(status_code=422, detail=f"No JSON found: {text[:200]}")
 
         extracted = json.loads(json_match.group(0))
         filled = {k: v for k, v in extracted.items() if v not in ("", None)}
-        print("Filled fields:", filled)
 
-        return {
-            "success": True,
-            "data": extracted,
-            "filled_count": len(filled),
-            "filled_fields": list(filled.keys())
-        }
+        return {"success": True, "data": extracted, "filled_count": len(filled), "filled_fields": list(filled.keys())}
 
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Request timed out. Try again.")
+        raise HTTPException(status_code=504, detail="Timed out. Try again.")
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=422, detail=f"JSON parse failed: {str(e)}")
+        raise HTTPException(status_code=422, detail=f"JSON error: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
