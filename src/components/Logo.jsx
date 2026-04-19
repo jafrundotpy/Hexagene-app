@@ -1,8 +1,12 @@
 import React from 'react';
 
-const Logo = ({ size = 28, showText = true, className = "" }) => {
+const Logo = ({ size = 28, showText = true, className = "", onClick }) => {
   return (
-    <div className={`logo-container ${className}`} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+    <div
+      className={`logo-container ${className}`}
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: onClick ? 'pointer' : 'default' }}
+    >
       <div 
         className="logo-mark" 
         style={{ 
