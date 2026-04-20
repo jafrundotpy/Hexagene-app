@@ -1,4 +1,6 @@
-import React, { useState, useRef } from "react";
+Replace the entire content of src/pages/dashboard/Simulations.jsx with this:
+
+import React, { useState, useRef, useEffect } from "react";
 
 const TABS = [
   { id: "input", icon: "📱", label: "Data Input" },
@@ -84,13 +86,10 @@ const S = {
   input: {width:"100%",padding:"10px 12px",borderRadius:"8px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#e2e8f0",fontSize:"13px",outline:"none",boxSizing:"border-box"},
   secTitle: {display:"flex",alignItems:"center",gap:"8px",marginBottom:"14px",marginTop:"20px"},
   secLabel: {fontSize:"12px",fontWeight:"800",color:"#4fc3f7",textTransform:"uppercase",letterSpacing:"1px"},
-  progressBar: (val,color="#4fc3f7") => ({
-    height:"6px",borderRadius:"3px",background:"rgba(255,255,255,0.06)",marginTop:"6px",overflow:"hidden"
-  }),
 };
 
 const ProgressBar = ({value,color="#4fc3f7"}) => (
-  <div style={S.progressBar(value,color)}>
+  <div style={{height:"6px",borderRadius:"3px",background:"rgba(255,255,255,0.06)",marginTop:"6px",overflow:"hidden"}}>
     <div style={{width:`${Math.round(value)}%`,height:"100%",background:color,borderRadius:"3px",transition:"width 1s ease"}}/>
   </div>
 );
@@ -131,6 +130,216 @@ const Footer = () => (
     <p style={{margin:"4px 0 0",fontSize:"11px",color:"#334155"}}>🚀 Complete Lifestyle Intelligence: Your Personal Health Coach</p>
   </div>
 );
+
+const AnimatedCounter = ({target,duration=2000,suffix=""}) => {
+  const [val,setVal] = useState(0);
+  useEffect(()=>{
+    let start=0;
+    const step=target/((duration/1000)*60);
+    const timer=setInterval(()=>{
+      start+=step;
+      if(start>=target){setVal(target);clearInterval(timer);}
+      else setVal(Math.round(start));
+    },1000/60);
+    return ()=>clearInterval(timer);
+  },[target]);
+  return <span>{val}{suffix}</span>;
+};
+
+const TimelineBar = ({label,current,oneMonth,oneYear,tenYear,color}) => (
+  <div style={{marginBottom:"1.25rem"}}>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
+      <span style={{fontSize:"12px",color:"#94a3b8",fontWeight:"600"}}>{label}</span>
+      <div style={{display:"flex",gap:"12px"}}>
+        <span style={{fontSize:"11px",color:"#64748b"}}>Now: <span style={{color:"#e2e8f0",fontWeight:"700"}}>{Math.round(current)}%</span></span>
+        <span style={{fontSize:"11px",color:"#64748b"}}>1M: <span style={{color:"#4fc3f7",fontWeight:"700"}}>{Math.round(oneMonth)}%</span></span>
+        <span style={{fontSize:"11px",color:"#64748b"}}>1Y: <span style={{color:"#a78bfa",fontWeight:"700"}}>{Math.round(oneYear)}%</span></span>
+        <span style={{fontSize:"11px",color:"#64748b"}}>10Y: <span style={{color:color,fontWeight:"700"}}>{Math.round(tenYear)}%</span></span>
+      </div>
+    </div>
+    <div style={{position:"relative",height:"8px",borderRadius:"4px",background:"rgba(255,255,255,0.05)",overflow:"hidden"}}>
+      <div style={{position:"absolute",left:0,top:0,width:`${Math.round(current)}%`,height:"100%",background:"rgba(255,255,255,0.15)",borderRadius:"4px",transition:"width 1s ease"}}/>
+      <div style={{position:"absolute",left:0,top:0,width:`${Math.round(oneMonth)}%`,height:"100%",background:"rgba(79,195,247,0.4)",borderRadius:"4px",transition:"width 1.2s ease"}}/>
+      <div style={{position:"absolute",left:0,top:0,width:`${Math.round(oneYear)}%`,height:"100%",background:"rgba(167,139,250,0.5)",borderRadius:"4px",transition:"width 1.4s ease"}}/>
+      <div style={{position:"absolute",left:0,top:0,width:`${Math.round(tenYear)}%`,height:"100%",background:color,borderRadius:"4px",transition:"width 1.6s ease",opacity:0.8}}/>
+    </div>
+    <div style={{display:"flex",gap:"16px",marginTop:"4px"}}>
+      {[{c:"rgba(255,255,255,0.15)",l:"Current"},{c:"rgba(79,195,247,0.6)",l:"1 Month"},{c:"rgba(167,139,250,0.7)",l:"1 Year"},{c:color,l:"10 Years"}].map(({c,l})=>(
+        <div key={l} style={{display:"flex",alignItems:"center",gap:"4px"}}>
+          <div style={{width:"8px",height:"8px",borderRadius:"50%",background:c}}/>
+          <span style={{fontSize:"10px",color:"#475569"}}>{l}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const PredictionCard = ({horizon,icon,riskDelta,topInsight,color,metrics,delay}) => {
+  const [visible,setVisible] = useState(false);
+  useEffect(()=>{const t=setTimeout(()=>setVisible(true),delay);return()=>clearTimeout(t);},[]);
+  return (
+    <div style={{...S.card,border:`1px solid ${color}30`,opacity:visible?1:0,transform:visible?"translateY(0)":"translateY(20px)",transition:"all 0.6s ease",background:`linear-gradient(135deg, rgba(0,0,0,0.3), ${color}08)`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1rem"}}>
+        <div>
+          <div style={{fontSize:"28px",marginBottom:"4px"}}>{icon}</div>
+          <p style={{margin:0,fontSize:"16px",fontWeight:"900",color}}>{horizon}</p>
+          <p style={{margin:0,fontSize:"11px",color:"#64748b"}}>Prediction Window</p>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:"32px",fontWeight:"900",color:riskDelta<0?"#22c55e":"#ef4444"}}>
+            {riskDelta<0?"↓":"↑"}{Math.abs(riskDelta)}%
+          </div>
+          <p style={{margin:0,fontSize:"11px",color:"#64748b"}}>Risk {riskDelta<0?"reduction":"increase"}</p>
+        </div>
+      </div>
+      <div style={{borderLeft:`3px solid ${color}`,paddingLeft:"12px",marginBottom:"1rem"}}>
+        <p style={{margin:0,fontSize:"12px",color:"#94a3b8",lineHeight:"1.6"}}>{topInsight}</p>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+        {metrics.map(({label,value,trend})=>(
+          <div key={label} style={{padding:"8px 10px",borderRadius:"8px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)"}}>
+            <p style={{margin:0,fontSize:"10px",color:"#64748b",textTransform:"uppercase",letterSpacing:"0.5px"}}>{label}</p>
+            <p style={{margin:"2px 0 0",fontSize:"14px",fontWeight:"700",color:trend==="up"?"#22c55e":trend==="down"?"#ef4444":"#f59e0b"}}>{value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const FutureOptimization = ({form}) => {
+  const risk = calcRisk(form);
+  const s21 = calcS21(form);
+  const hasData = Object.values(form).some(v=>v!=="");
+
+  const proj = {
+    oneMonth: {
+      risk: Math.max(5, risk - (risk>60?8:risk>40?5:3)),
+      structural: Math.min(100, s21.structural + 5),
+      metabolic: Math.min(100, s21.metabolic + 4),
+      kinetic: Math.min(100, s21.kinetic + 8),
+      hrv: Math.min(100, (parseInt(form.hrv||40)) + 5),
+    },
+    oneYear: {
+      risk: Math.max(5, risk - (risk>60?22:risk>40?15:8)),
+      structural: Math.min(100, s21.structural + 15),
+      metabolic: Math.min(100, s21.metabolic + 18),
+      kinetic: Math.min(100, s21.kinetic + 20),
+      hrv: Math.min(100, (parseInt(form.hrv||40)) + 18),
+    },
+    tenYear: {
+      risk: Math.max(5, risk - (risk>60?38:risk>40?28:15)),
+      structural: Math.min(100, s21.structural + 28),
+      metabolic: Math.min(100, s21.metabolic + 32),
+      kinetic: Math.min(100, s21.kinetic + 35),
+      hrv: Math.min(100, (parseInt(form.hrv||40)) + 30),
+    },
+  };
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"2rem"}}>
+        <div>
+          <h2 style={{margin:"0 0 4px",fontSize:"1.4rem",fontWeight:"900",background:"linear-gradient(135deg,#a78bfa,#4fc3f7)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+            Future Optimization Engine
+          </h2>
+          <p style={{margin:0,fontSize:"13px",color:"#64748b"}}>S21 Physics-based trajectory modeling across 3 time horizons</p>
+        </div>
+        <div style={{padding:"8px 16px",borderRadius:"20px",background:"rgba(167,139,250,0.1)",border:"1px solid rgba(167,139,250,0.3)",fontSize:"12px",color:"#a78bfa",fontWeight:"700"}}>
+          {hasData?"LIVE PROJECTION":"DEMO MODE"}
+        </div>
+      </div>
+
+      {!hasData && (
+        <div style={{...S.card,textAlign:"center",padding:"1.5rem",marginBottom:"1.5rem",border:"1px solid rgba(245,158,11,0.2)",background:"rgba(245,158,11,0.04)"}}>
+          <p style={{margin:0,fontSize:"13px",color:"#f59e0b"}}>⚠️ Go to Data Input tab and enter your biomarkers or load random data for personalized predictions</p>
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"1rem",marginBottom:"2rem"}}>
+        <PredictionCard
+          horizon="1 Month" icon="📅" color="#4fc3f7" delay={0}
+          riskDelta={-(risk - proj.oneMonth.risk)}
+          topInsight="Consistent sleep optimization and anti-inflammatory nutrition will show measurable biomarker improvement within 30 days."
+          metrics={[
+            {label:"Structural",value:`${Math.round(proj.oneMonth.structural)}%`,trend:"up"},
+            {label:"Metabolic",value:`${Math.round(proj.oneMonth.metabolic)}%`,trend:"up"},
+            {label:"Kinetic",value:`${Math.round(proj.oneMonth.kinetic)}%`,trend:"up"},
+            {label:"HRV Target",value:`${Math.round(proj.oneMonth.hrv)} ms`,trend:"up"},
+          ]}
+        />
+        <PredictionCard
+          horizon="1 Year" icon="📆" color="#a78bfa" delay={200}
+          riskDelta={-(risk - proj.oneYear.risk)}
+          topInsight="Sustained lifestyle changes will significantly reduce inflammatory markers, improve metabolic function and structural resilience."
+          metrics={[
+            {label:"Structural",value:`${Math.round(proj.oneYear.structural)}%`,trend:"up"},
+            {label:"Metabolic",value:`${Math.round(proj.oneYear.metabolic)}%`,trend:"up"},
+            {label:"Kinetic",value:`${Math.round(proj.oneYear.kinetic)}%`,trend:"up"},
+            {label:"HRV Target",value:`${Math.round(proj.oneYear.hrv)} ms`,trend:"up"},
+          ]}
+        />
+        <PredictionCard
+          horizon="10 Years" icon="🔮" color="#22c55e" delay={400}
+          riskDelta={-(risk - proj.tenYear.risk)}
+          topInsight="Long-term structural physics optimization leads to significant disease prevention and biological age reversal potential."
+          metrics={[
+            {label:"Structural",value:`${Math.round(proj.tenYear.structural)}%`,trend:"up"},
+            {label:"Metabolic",value:`${Math.round(proj.tenYear.metabolic)}%`,trend:"up"},
+            {label:"Kinetic",value:`${Math.round(proj.tenYear.kinetic)}%`,trend:"up"},
+            {label:"HRV Target",value:`${Math.round(proj.tenYear.hrv)} ms`,trend:"up"},
+          ]}
+        />
+      </div>
+
+      <div style={{...S.card,marginBottom:"1.5rem"}}>
+        <SecTitle icon="📊" label="Trajectory Timeline"/>
+        <TimelineBar label="Overall Risk Score" current={risk} oneMonth={proj.oneMonth.risk} oneYear={proj.oneYear.risk} tenYear={proj.tenYear.risk} color="#ef4444"/>
+        <TimelineBar label="Structural Health" current={s21.structural} oneMonth={proj.oneMonth.structural} oneYear={proj.oneYear.structural} tenYear={proj.tenYear.structural} color="#4fc3f7"/>
+        <TimelineBar label="Metabolic Health" current={s21.metabolic} oneMonth={proj.oneMonth.metabolic} oneYear={proj.oneYear.metabolic} tenYear={proj.tenYear.metabolic} color="#f59e0b"/>
+        <TimelineBar label="Kinetic Performance" current={s21.kinetic} oneMonth={proj.oneMonth.kinetic} oneYear={proj.oneYear.kinetic} tenYear={proj.tenYear.kinetic} color="#22c55e"/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"1rem",marginBottom:"1.5rem"}}>
+        {[
+          {period:"30 Days",icon:"🎯",actions:["Optimize sleep to 7-8 hours nightly","Reduce processed food intake by 50%","Walk 8,000+ steps daily","Start HRV tracking routine"],color:"#4fc3f7"},
+          {period:"12 Months",icon:"💪",actions:["Complete anti-inflammatory diet protocol","Strength training 3x per week","Annual biomarker blood panel","Achieve target HRV baseline"],color:"#a78bfa"},
+          {period:"10 Years",icon:"🔮",actions:["Biological age optimization program","DNA methylation improvement","Metabolic syndrome prevention","Full S21 axis stabilization"],color:"#22c55e"},
+        ].map(({period,icon,actions,color})=>(
+          <div key={period} style={{...S.card,border:`1px solid ${color}25`}}>
+            <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"1rem"}}>
+              <span style={{fontSize:"24px"}}>{icon}</span>
+              <div>
+                <p style={{margin:0,fontWeight:"800",fontSize:"14px",color}}>{period} Action Plan</p>
+                <p style={{margin:0,fontSize:"11px",color:"#475569"}}>Priority interventions</p>
+              </div>
+            </div>
+            {actions.map((a,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:"8px",marginBottom:"8px"}}>
+                <div style={{width:"18px",height:"18px",borderRadius:"50%",background:`${color}20`,border:`1px solid ${color}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"10px",fontWeight:"800",color,flexShrink:0,marginTop:"1px"}}>{i+1}</div>
+                <p style={{margin:0,fontSize:"12px",color:"#94a3b8",lineHeight:"1.5"}}>{a}</p>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div style={{...S.card,background:"linear-gradient(135deg,rgba(167,139,250,0.08),rgba(79,195,247,0.08))",border:"1px solid rgba(167,139,250,0.2)",textAlign:"center",padding:"2rem"}}>
+        <div style={{fontSize:"36px",marginBottom:"12px"}}>🧬</div>
+        <h3 style={{margin:"0 0 8px",color:"#a78bfa",fontWeight:"800"}}>Unlock DNA Integration</h3>
+        <p style={{margin:"0 0 1.5rem",fontSize:"13px",color:"#64748b",maxWidth:"500px",marginLeft:"auto",marginRight:"auto"}}>
+          Connect your genetic data to unlock full S21 physics projection including epigenetic age modeling, variant risk scoring, and personalized longevity pathways.
+        </p>
+        <div style={{display:"flex",justifyContent:"center",gap:"12px"}}>
+          <div style={{padding:"6px 16px",borderRadius:"20px",background:"rgba(167,139,250,0.1)",color:"#a78bfa",border:"1px solid rgba(167,139,250,0.3)",fontSize:"12px",fontWeight:"700"}}>Coming Soon</div>
+          <div style={{padding:"6px 16px",borderRadius:"20px",background:"rgba(79,195,247,0.1)",color:"#4fc3f7",border:"1px solid rgba(79,195,247,0.3)",fontSize:"12px",fontWeight:"700"}}>S21 Physics Engine v2</div>
+        </div>
+      </div>
+
+      <Footer/>
+    </div>
+  );
+};
 
 const Simulations = () => {
   const [activeTab,setActiveTab] = useState("input");
@@ -241,7 +450,6 @@ const Simulations = () => {
 
   return (
     <div style={{minHeight:"100vh",color:"#e2e8f0",padding:"0"}}>
-
       <div style={{textAlign:"center",padding:"2rem 2rem 1rem",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
         <h1 style={{fontSize:"2rem",fontWeight:"900",background:"linear-gradient(135deg,#4fc3f7,#a78bfa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",margin:"0 0 4px"}}>HexaGene V13</h1>
         <p style={{color:"#64748b",fontSize:"13px",margin:"0 0 12px"}}>Complete Lifestyle Intelligence with S21 Physics</p>
@@ -261,7 +469,7 @@ const Simulations = () => {
         {activeTab==="input" && (
           <div style={{display:"grid",gridTemplateColumns:"1fr 380px",gap:"2rem",alignItems:"start"}}>
             <div>
-              <div style={{...S.card,border:"1px solid rgba(79,195,247,0.25)",marginBottom:"1.5rem"}}>
+              <div style={{borderRadius:"12px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(79,195,247,0.25)",padding:"1.25rem",marginBottom:"1.5rem"}}>
                 <SecTitle icon="🧬" label="Multi-Modal Health Input"/>
                 <div
                   onDragOver={e=>{e.preventDefault();setDragOver(true);}}
@@ -281,7 +489,6 @@ const Simulations = () => {
                   </div>
                 )}
               </div>
-
               <div style={S.card}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 1.5rem"}}>
                   <div style={{gridColumn:"1/-1"}}><SecTitle icon="👤" label="Demographics"/></div>
@@ -319,7 +526,6 @@ const Simulations = () => {
                 </div>
               </div>
             </div>
-
             <div style={{position:"sticky",top:"20px"}}>
               <div style={{...S.card,textAlign:"center"}}>
                 {analysisRun&&riskScore!==null?(
@@ -512,15 +718,7 @@ const Simulations = () => {
           </div>
         )}
 
-        {activeTab==="future" && (
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"400px",gap:"1rem"}}>
-            <div style={{fontSize:"64px"}}>🔮</div>
-            <h2 style={{color:"#4fc3f7",margin:0,fontSize:"1.5rem"}}>Future Optimization</h2>
-            <p style={{color:"#64748b",fontSize:"14px",margin:0,textAlign:"center",maxWidth:"400px"}}>Long-term health trajectory modeling and predictive optimization coming soon. Connect your DNA data to unlock full S21 physics projection.</p>
-            <div style={{padding:"8px 20px",borderRadius:"20px",background:"rgba(79,195,247,0.1)",color:"#4fc3f7",border:"1px solid rgba(79,195,247,0.2)",fontSize:"12px",fontWeight:"700"}}>Coming Soon</div>
-            <Footer/>
-          </div>
-        )}
+        {activeTab==="future" && <FutureOptimization form={form}/>}
 
       </div>
     </div>
