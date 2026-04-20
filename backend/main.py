@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException, Depends
+﻿from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
-import os, json, re, httpx
+import os, json, re, httpx, base64 as b64lib
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,7 +14,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 if not SECRET_KEY or not ALGORITHM:
     raise ValueError("SECRET_KEY and ALGORITHM must be set")
@@ -48,8 +47,77 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+def extract_metrics_from_text(text):
+    text = text.lower()
+    result = {
+        "age":"","sex":"","activityLevel":"","albumin":"","crp":"","hba1c":"",
+        "egfr":"","rdw":"","uricAcid":"","restingHR":"","dailySteps":"",
+        "activeMinutes":"","vo2max":"","hrv":"","recoveryScore":"",
+        "sleepDuration":"","sleepScore":"","sleepDebt":""
+    }
+
+    steps = re.search(r'([\d,]+)\s*steps', text)
+    if steps:
+        result["dailySteps"] = steps.group(1).replace(",","")
+
+    sleep_score = re.search(r'sleep\s*score.*?(\d+)\s*points?|(\d+)\s*points?\s*.*?sleep', text)
+    if sleep_score:
+        result["sleepScore"] = sleep_score.group(1) or sleep_score.group(2)
+
+    sleep_score2 = re.search(r'sleep.*?(\d{2,3})\s*(?:pts|points|score)', text)
+    if not result["sleepScore"] and sleep_score2:
+        result["sleepScore"] = sleep_score2.group(1)
+
+    hrv = re.search(r'(?:hrv|heart rate variability).*?(\d+)\s*ms|(\d+)\s*ms.*?(?:hrv|heart rate variability)', text)
+    if hrv:
+        result["hrv"] = hrv.group(1) or hrv.group(2)
+
+    hrv2 = re.search(r'average\s*(\d+)\s*ms', text)
+    if not result["hrv"] and hrv2:
+        result["hrv"] = hrv2.group(1)
+
+    resting = re.search(r'resting\s*(?:heart rate|hr).*?(\d+)\s*bpm|(\d+)\s*bpm.*?resting', text)
+    if resting:
+        result["restingHR"] = resting.group(1) or resting.group(2)
+
+    recovery = re.search(r'recovery.*?(\d+)\s*%|(\d+)\s*%.*?recovery|readiness.*?(\d+)|(\d+).*?readiness', text)
+    if recovery:
+        result["recoveryScore"] = next(x for x in recovery.groups() if x)
+
+    active = re.search(r'(\d+)\s*active\s*min|active\s*minutes.*?(\d+)', text)
+    if active:
+        result["activeMinutes"] = active.group(1) or active.group(2)
+
+    vo2 = re.search(r'vo2\s*max.*?([\d.]+)|([\d.]+).*?vo2\s*max', text)
+    if vo2:
+        result["vo2max"] = vo2.group(1) or vo2.group(2)
+
+    sleep_hrs = re.search(r'(\d+)h\s*(\d+)m|(\d+)\s*hours?\s*(\d+)\s*min', text)
+    if sleep_hrs:
+        h = int(sleep_hrs.group(1) or sleep_hrs.group(3))
+        m = int(sleep_hrs.group(2) or sleep_hrs.group(4))
+        result["sleepDuration"] = str(round(h + m/60, 1))
+
+    sleep_hrs2 = re.search(r'(\d+\.?\d*)\s*hours?\s*(?:of\s*)?sleep|sleep.*?(\d+\.?\d*)\s*hours?', text)
+    if not result["sleepDuration"] and sleep_hrs2:
+        result["sleepDuration"] = sleep_hrs2.group(1) or sleep_hrs2.group(2)
+
+    hba1c = re.search(r'hba1c.*?([\d.]+)\s*%|([\d.]+)\s*%.*?hba1c', text)
+    if hba1c:
+        result["hba1c"] = hba1c.group(1) or hba1c.group(2)
+
+    crp = re.search(r'crp.*?([\d.]+)\s*mg|([\d.]+)\s*mg.*?crp', text)
+    if crp:
+        result["crp"] = crp.group(1) or crp.group(2)
+
+    egfr = re.search(r'egfr.*?(\d+)|(\d+).*?egfr', text)
+    if egfr:
+        result["egfr"] = egfr.group(1) or egfr.group(2)
+
+    return result
+
 @app.get("/")
-def root(): return {"message": "Backend running", "gemini": bool(GEMINI_API_KEY)}
+def root(): return {"message": "Backend running"}
 
 @app.post("/auth/signup")
 def signup(user: UserSignup):
@@ -83,30 +151,38 @@ async def extract_screenshot(payload: dict):
     media_type = payload.get("media_type", "image/jpeg")
     if not image_data:
         raise HTTPException(status_code=400, detail="No image provided")
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set")
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            r = await client.post(
-                f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [
-                        {"inline_data": {"mime_type": media_type, "data": image_data}},
-                        {"text": "Extract health metrics from this screenshot. Return ONLY JSON with these keys: age, sex, activityLevel, albumin, crp, hba1c, egfr, rdw, uricAcid, restingHR, dailySteps, activeMinutes, vo2max, hrv, recoveryScore, sleepDuration, sleepScore, sleepDebt. Use empty string if not found. Numbers as strings without units. dailySteps remove commas. sleepDuration in decimal hours. Only restingHR if labeled resting."}
-                    ]}],
-                    "generationConfig": {"temperature": 0, "maxOutputTokens": 500}
-                }
-            )
-        result = r.json()
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=f"Gemini error: {result['error']['message']}")
-        text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-        match = re.search(r'\{.*?\}', text, re.DOTALL)
-        if not match:
-            raise HTTPException(status_code=422, detail="No JSON in response")
-        extracted = json.loads(match.group(0))
+        img_bytes = b64lib.b64decode(image_data)
+        try:
+            import pytesseract
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(img_bytes))
+            text = pytesseract.image_to_string(img)
+            print("OCR text:", text)
+        except Exception as ocr_err:
+            print("OCR failed, trying free API:", ocr_err)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                r = await client.post(
+                    "https://api.ocr.space/parse/image",
+                    data={
+                        "apikey": "helloworld",
+                        "base64Image": f"data:{media_type};base64,{image_data}",
+                        "language": "eng",
+                        "isOverlayRequired": "false"
+                    }
+                )
+            ocr_result = r.json()
+            print("OCR.space result:", ocr_result)
+            text = ""
+            if ocr_result.get("ParsedResults"):
+                text = ocr_result["ParsedResults"][0].get("ParsedText", "")
+            if not text:
+                raise HTTPException(status_code=422, detail="Could not read text from image. Try a clearer screenshot.")
+
+        extracted = extract_metrics_from_text(text)
         filled = {k: v for k, v in extracted.items() if v not in ("", None)}
+        print("Extracted:", filled)
         return {"success": True, "data": extracted, "filled_count": len(filled), "filled_fields": list(filled.keys())}
     except HTTPException: raise
     except Exception as e:
