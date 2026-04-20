@@ -1,5 +1,3 @@
-Replace the entire content of src/pages/dashboard/Simulations.jsx with this:
-
 import React, { useState, useRef, useEffect } from "react";
 
 const TABS = [
