@@ -287,37 +287,23 @@ async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
     data = request.patient_data
     print("Extracted patient_data:", data)
 
-    # --- Validation ---
-    def to_float(val, default=0.0):
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            return default
-
-    crp = to_float(data.get("crp"))
-    hba1c = to_float(data.get("hba1c"))
-
-    if crp == 0.0 and "crp" in data:
-        raise HTTPException(status_code=400, detail="Invalid value for 'crp': must be a non-zero number")
-    if hba1c == 0.0 and "hba1c" in data:
-        raise HTTPException(status_code=400, detail="Invalid value for 'hba1c': must be a non-zero number")
-
-    if not data.get("crp") and not data.get("hba1c"):
+    # Only reject if the request body is completely empty
+    if not data:
         raise HTTPException(
             status_code=400,
-            detail="Missing required fields: crp and hba1c"
+            detail={"success": False, "message": "Request body is empty. patient_data is required."}
         )
 
     try:
         result = run_analysis_logic(key_data, data)
 
-        # Increment usage count
+        # Increment usage count (non-blocking)
         try:
             supabase.table("api_keys").update({
                 "usage_count": key_data.get("usage_count", 0) + 1
             }).eq("id", key_data["id"]).execute()
-        except Exception as e:
-            print("Usage increment error:", e)
+        except Exception as usage_err:
+            print("Usage increment error:", usage_err)
 
         return result
     except HTTPException:
