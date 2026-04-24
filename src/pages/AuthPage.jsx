@@ -64,7 +64,22 @@ const AuthPage = ({ mode = "login" }) => {
 
       if (isLogin) {
         const token = data.access_token || data.token;
+        localStorage.setItem("token", token);
         login({ name: data.name || email.split("@")[0], email }, token);
+        
+        try {
+          const keyResponse = await fetch(`${API_URL}/api/generate-key`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          });
+          const keyData = await keyResponse.json();
+          if (keyData.api_key) {
+            localStorage.setItem("api_key", keyData.api_key);
+          }
+        } catch (keyErr) {
+          console.error("Failed to generate API key:", keyErr);
+        }
+
         navigate("/dashboard/analysis", { replace: true });
       } else {
         localStorage.setItem("pendingName", name);

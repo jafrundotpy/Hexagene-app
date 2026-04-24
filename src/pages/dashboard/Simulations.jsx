@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 
+const API_BASE = "https://your-backend-url.onrender.com";
+
 const TABS = [
   { id: "input", icon: "📱", label: "Data Input" },
   { id: "s21", icon: "🧬", label: "S21 Analysis" },
@@ -343,6 +345,7 @@ const Simulations = () => {
   const [activeTab,setActiveTab] = useState("input");
   const [form,setForm] = useState(defaultForm);
   const [riskScore,setRiskScore] = useState(null);
+  const [analysisData,setAnalysisData] = useState(null);
   const [analysisRun,setAnalysisRun] = useState(false);
   const [uploading,setUploading] = useState(false);
   const [uploadMsg,setUploadMsg] = useState("");
@@ -351,9 +354,59 @@ const Simulations = () => {
 
   const updateField = (key) => (val) => setForm(f=>({...f,[key]:val}));
 
-  const handleRunAnalysis = () => {
-    setRiskScore(calcRisk(form));
-    setAnalysisRun(true);
+  const handleRunAnalysis = async () => {
+    try {
+      console.log("Form data:", form);
+      const apiKey = localStorage.getItem("api_key");
+
+      if (!apiKey) {
+        alert("No API key found. Please login again.");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE}/api/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey
+        },
+        body: JSON.stringify({
+          patient_data: form
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err);
+      }
+
+      const data = await response.json();
+
+      if (data?.result?.axes) {
+        const axes = data.result.axes;
+
+        const avgScore = Math.round(
+          (
+            axes.structural_integrity +
+            axes.inflammation +
+            axes.metabolism +
+            axes.cellular_stress +
+            axes.organ_function +
+            axes.biochemical_balance
+          ) / 6
+        );
+
+        setRiskScore(avgScore);
+        setAnalysisData(data.result);
+        setAnalysisRun(true);
+
+        console.log("Analysis result:", data);
+      }
+
+    } catch (err) {
+      console.error("Analyze error:", err);
+      alert("Backend connection failed");
+    }
   };
 
   const handleLoadRandom = () => {
@@ -407,7 +460,16 @@ const Simulations = () => {
     boxShadow:activeTab===id?"0 4px 15px rgba(79,195,247,0.3)":"none",
   });
 
-  const s21 = calcS21(form);
+  const s21 = analysisData
+  ? {
+      structural: analysisData.axes.structural_integrity,
+      inflammatory: analysisData.axes.inflammation,
+      metabolic: analysisData.axes.metabolism,
+      redox: analysisData.axes.cellular_stress,
+      kinetic: analysisData.axes.organ_function,
+      balance: analysisData.axes.biochemical_balance,
+    }
+  : calcS21(form);
   const readiness = calcReadiness(form);
   const risk = riskScore || calcRisk(form);
 

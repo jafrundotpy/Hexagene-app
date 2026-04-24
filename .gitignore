@@ -25,6 +25,7 @@ dist-ssr
 
 # Requested additions
 node_modules/
+venv/
 pycache/
 __pycache__/
 .env

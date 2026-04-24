@@ -5,30 +5,30 @@ from pydantic import BaseModel
 import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-import os, json, re, uuid, secrets, base64 as b64lib
-try:
-    import httpx
-except Exception as e:
-    httpx = None
-    print(f"Warning: Failed to import httpx: {e}")
+import os, uuid, secrets
+
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase_client import supabase
 
-# Configure logging
+# -----------------------------
+# CONFIG
+# -----------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load .env from the backend folder (same as supabase_client.py)
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
-app = FastAPI(title="HexaGene API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting HexaGene API...")
-    logger.info("Supabase client is ready.")
+app = FastAPI(title="HexaGene API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
@@ -38,7 +38,9 @@ if not SECRET_KEY or not ALGORITHM:
 
 security = HTTPBearer(auto_error=False)
 
-# --- MODELS ---
+# -----------------------------
+# MODELS
+# -----------------------------
 class UserSignup(BaseModel):
     name: str
     email: str
@@ -51,14 +53,17 @@ class UserLogin(BaseModel):
 class AnalysisRequest(BaseModel):
     patient_data: dict
 
-# --- HELPERS ---
+# -----------------------------
+# HELPERS
+# -----------------------------
+def clamp(value):
+    return max(0, min(100, value))
+
 def hash_password(p: str) -> str:
-    encoded = p.encode("utf-8")[:72]
-    return bcrypt.hashpw(encoded, bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hashpw(p.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(p: str, h: str) -> bool:
-    encoded = p.encode("utf-8")[:72]
-    return bcrypt.checkpw(encoded, h.encode("utf-8"))
+    return bcrypt.checkpw(p.encode("utf-8")[:72], h.encode("utf-8"))
 
 def create_token(data):
     d = data.copy()
@@ -69,170 +74,234 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
+        return jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def verify_api_key(x_api_key: str = Header(None)):
+    print("API KEY:", x_api_key)
     if not x_api_key:
-        raise HTTPException(status_code=401, detail="API key missing")
-    
-    if supabase is None:
-        raise HTTPException(status_code=503, detail="Database service unavailable")
+        raise HTTPException(status_code=401, detail="Missing API Key")
 
-    try:
-        # Use official supabase client syntax
-        res = supabase.table("api_keys").select("*").execute()
-        keys = res.data
-        valid_key = next((k for k in keys if k["api_key"] == x_api_key), None)
-        if not valid_key:
-            raise HTTPException(status_code=403, detail="Invalid API key")
-        return valid_key
-    except Exception as e:
-        logger.error(f"Database error in verify_api_key: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).execute()
 
-def extract_metrics_from_text(text):
-    text = text.lower()
-    result = {
-        "age":"","sex":"","activityLevel":"","albumin":"","crp":"","hba1c":"",
-        "egfr":"","rdw":"","uricAcid":"","restingHR":"","dailySteps":"",
-        "activeMinutes":"","vo2max":"","hrv":"","recoveryScore":"",
-        "sleepDuration":"","sleepScore":"","sleepDebt":""
-    }
-    steps = re.search(r'([\d,]+)\s*steps', text); 
-    if steps: result["dailySteps"] = steps.group(1).replace(",","")
-    sleep_score = re.search(r'sleep\s*score.*?(\d+)\s*points?|(\d+)\s*points?\s*.*?sleep', text)
-    if sleep_score: result["sleepScore"] = sleep_score.group(1) or sleep_score.group(2)
-    hrv = re.search(r'(?:hrv|heart rate variability).*?(\d+)\s*ms|(\d+)\s*ms.*?(?:hrv|heart rate variability)', text)
-    if hrv: result["hrv"] = hrv.group(1) or hrv.group(2)
-    resting = re.search(r'resting\s*(?:heart rate|hr).*?(\d+)\s*bpm', text)
-    if resting: result["restingHR"] = resting.group(1)
-    return result
+    if not res.data:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
 
-# --- ENDPOINTS ---
+    return res.data[0]  # contains user_id (VALID UUID)
 
+# -----------------------------
+# AUTH
+# -----------------------------
 @app.post("/auth/signup")
 async def signup(user: UserSignup):
-    try:
-        # Check if user already exists (filtered query — no full table scan)
-        existing = supabase.table("users").select("id").eq("email", user.email).execute()
-        if existing.data:
-            raise HTTPException(status_code=400, detail="User already exists")
+    user_id = str(uuid.uuid4())
+    hashed_pw = hash_password(user.password)
 
-        new_user = {
-            "id": str(uuid.uuid4()),
-            "name": user.name,
+    try:
+        supabase.table("users").insert({
+            "id": user_id,
             "email": user.email,
-            "password": hash_password(user.password),
-        }
-        result = supabase.table("users").insert(new_user).execute()
-        if not result.data:
-            raise HTTPException(status_code=500, detail="Insert returned no data — check RLS and table schema")
-        return {"message": "User created successfully"}
-    except HTTPException:
-        raise
+            "name": user.name,
+            "password": hashed_pw
+        }).execute()
     except Exception as e:
-        logger.error(f"Signup error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"user_id": user_id}
 
 @app.post("/auth/login")
 async def login(user: UserLogin):
-    try:
-        res = supabase.table("users").select("id, name, email, password").eq("email", user.email).execute()
-        if not res.data:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-        db_user = res.data[0]
+    res = supabase.table("users").select("*").eq("email", user.email).execute()
+    if not res.data:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not verify_password(user.password, db_user["password"]):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+    db_user = res.data[0]
 
-        token = create_token({"sub": db_user["email"], "id": db_user["id"]})
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "user": {"name": db_user["name"], "email": db_user["email"]}
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    if not verify_password(user.password, db_user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    token = create_token({"sub": db_user["email"], "id": db_user["id"]})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"name": db_user["name"], "email": db_user["email"]}
+    }
+
+# -----------------------------
+# API KEY
+# -----------------------------
 @app.post("/api/generate-key")
-async def generate_key(user=Depends(get_current_user)):
-    try:
-        new_key = f"hx_{secrets.token_urlsafe(32)}"
-        supabase.table("api_keys").insert({"user_id": user["id"], "api_key": new_key}).execute()
-        return {"api_key": new_key}
-    except Exception as e:
-        logger.error(f"Generate key error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+async def generate_key():
+    import uuid
+    import traceback
 
-@app.get("/api/keys")
-async def get_keys(user=Depends(get_current_user)):
-    try:
-        res = supabase.table("api_keys").select("*").execute()
-        all_keys = res.data
-        return [k for k in all_keys if k["user_id"] == user["id"]]
-    except Exception as e:
-        logger.error(f"Get keys error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # create valid UUID user
+    user_id = str(uuid.uuid4())
+    key = "hx_" + uuid.uuid4().hex
+    random_email = f"demo_{uuid.uuid4().hex[:8]}@hexagene.com"
 
-@app.delete("/api/keys/{key_id}")
-async def revoke_key(key_id: str, user=Depends(get_current_user)):
     try:
-        supabase.table("api_keys").delete().eq("id", key_id).execute()
-        return {"message": "Key revoked"}
-    except Exception as e:
-        logger.error(f"Revoke key error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # insert user
+        supabase.table("users").insert({
+            "id": user_id,
+            "email": random_email,
+            "name": "API Key User",
+            "password": "no_password"
+        }).execute()
 
+        # insert API key linked to user
+        supabase.table("api_keys").insert({
+            "api_key": key,
+            "user_id": user_id
+        }).execute()
+
+        return {"api_key": key}
+    except Exception as e:
+        print("GENERATE KEY ERROR:", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+
+# -----------------------------
+# ANALYZE (ADVANCED ENGINE)
+# -----------------------------
 @app.post("/api/analyze")
-async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
+async def analyze(request: dict, key_data=Depends(verify_api_key)):
     try:
-        supabase.table("usage_logs").insert({"user_id": key_data["user_id"], "endpoint": "/api/analyze"}).execute()
+        # -----------------------------
+        # LOGGING (SAFE)
+        # -----------------------------
+        try:
+            supabase.table("usage_logs").insert({
+                "user_id": key_data["user_id"],
+                "endpoint": "/api/analyze"
+            }).execute()
+        except Exception as e:
+            print("LOG ERROR:", e)
+
+        # -----------------------------
+        # INPUT
+        # -----------------------------
+        data = request.get("patient_data", request)
+
+        def safe_float(val, default):
+            try:
+                if val is None or val == "":
+                    return default
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
+        try:
+            hba1c_raw = data.get("hba1c")
+            crp_raw = data.get("crp")
+            
+            if hba1c_raw is None or crp_raw is None or hba1c_raw == "" or crp_raw == "":
+                hba1c = 5.9
+                crp = 2.1
+            else:
+                hba1c = float(hba1c_raw)
+                crp = float(crp_raw)
+        except (ValueError, TypeError):
+            hba1c = 5.9
+            crp = 2.1
+
+        albumin = safe_float(data.get("albumin"), 4.0)
+        egfr = safe_float(data.get("egfr"), 90.0)
+        triglycerides = safe_float(data.get("triglycerides"), 120.0)
+        rdw = safe_float(data.get("rdw"), 13.0)
+        uric_acid = safe_float(data.get("uric_acid"), 5.0)
+
+        # -----------------------------
+        # BASE SCORES
+        # -----------------------------
+        inflammation = clamp(100 - (crp * 20))
+        metabolism = clamp(100 - (hba1c * 10))
+        structural = clamp(albumin * 20)
+        organ = clamp(egfr)
+        cellular = clamp(100 - (rdw * 5))
+        biochemical = clamp(100 - (uric_acid * 10))
+
+        # -----------------------------
+        # RELATIONSHIPS (CORE LOGIC)
+        # -----------------------------
+        metabolism -= (inflammation * 0.1)
+        organ -= (inflammation * 0.1)
+        cellular -= (inflammation * 0.15)
+
+        biochemical -= (metabolism * 0.05)
+
+        # Clamp again after interactions
+        inflammation = clamp(inflammation)
+        metabolism = clamp(metabolism)
+        structural = clamp(structural)
+        organ = clamp(organ)
+        cellular = clamp(cellular)
+        biochemical = clamp(biochemical)
+
+        # -----------------------------
+        # WEIGHT SYSTEM
+        # -----------------------------
+        weights = {
+            "structural": 0.15,
+            "inflammation": 0.20,
+            "metabolism": 0.20,
+            "cellular": 0.15,
+            "organ": 0.15,
+            "biochemical": 0.15
+        }
+
+        final_score = (
+            structural * weights["structural"] +
+            inflammation * weights["inflammation"] +
+            metabolism * weights["metabolism"] +
+            cellular * weights["cellular"] +
+            organ * weights["organ"] +
+            biochemical * weights["biochemical"]
+        )
+
+        final_score = round(clamp(final_score), 2)
+
+        # -----------------------------
+        # RESPONSE
+        # -----------------------------
+        result = {
+            "health_score": final_score,
+            "axes": {
+                "structural_integrity": round(structural, 2),
+                "inflammation": round(inflammation, 2),
+                "metabolism": round(metabolism, 2),
+                "cellular_stress": round(cellular, 2),
+                "organ_function": round(organ, 2),
+                "biochemical_balance": round(biochemical, 2)
+            },
+            "status": (
+                "Optimal" if final_score > 80 else
+                "Moderate" if final_score > 60 else
+                "At Risk"
+            )
+        }
+
         return {
             "success": True,
-            "result": {"risk_score": 0.2, "status": "Optimized"},
+            "result": result,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
     except Exception as e:
         logger.error(f"Analyze error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/extract-screenshot")
-async def extract_screenshot(payload: dict):
-    image_data = payload.get("image_data", "")
-    if not image_data: raise HTTPException(status_code=400, detail="No image")
-    try:
-        img_bytes = b64lib.b64decode(image_data)
-        try:
-            from PIL import Image
-            import io, pytesseract
-            img = Image.open(io.BytesIO(img_bytes))
-            text = pytesseract.image_to_string(img)
-        except:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                r = await client.post("https://api.ocr.space/parse/image", data={
-                    "apikey": "helloworld",
-                    "base64Image": f"data:image/jpeg;base64,{image_data}",
-                    "language": "eng"
-                })
-                text = r.json()["ParsedResults"][0]["ParsedText"]
-        extracted = extract_metrics_from_text(text)
-        return {"success": True, "data": extracted}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+# -----------------------------
+# ROOT
+# -----------------------------
 @app.get("/")
-def root(): return {"status": "HexaGene API Running", "python_version": "3.14.x"}
+def root():
+    return {"status": "HexaGene API Running"}
 
+# -----------------------------
+# RUN
+# -----------------------------
 if __name__ == "__main__":
     import uvicorn
-    try:
-        logger.info("Starting server via main.py...")
-        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-    except Exception as e:
-        logger.critical(f"Server failed to start: {e}")
+    uvicorn.run("main:app", reload=True)
