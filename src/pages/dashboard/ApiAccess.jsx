@@ -18,6 +18,7 @@ const ApiAccess = () => {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -45,21 +46,32 @@ const ApiAccess = () => {
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setGenerateError("");
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setGenerateError("Not authenticated. Please log in again.");
+        return;
+      }
       const res = await fetch(`${API_URL}/api/generate-key`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // Save new key to localStorage so /api/analyze can use it
-        if (data.api_key) {
-          localStorage.setItem("api_key", data.api_key);
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
         }
+      });
+      const data = await res.json();
+      if (res.ok && data.api_key) {
+        localStorage.setItem("api_key", data.api_key);
+        console.log("New API key saved:", data.api_key.substring(0, 12) + "...");
         await fetchKeys();
+      } else {
+        const msg = data.detail?.message || data.detail || "Failed to generate key";
+        setGenerateError(msg);
+        console.error("Generate key error:", data);
       }
     } catch (err) {
+      setGenerateError("Network error: " + err.message);
       console.error("Failed to generate key", err);
     } finally {
       setGenerating(false);
@@ -156,6 +168,12 @@ const ApiAccess = () => {
                 Generate New Key
               </button>
             </div>
+            {generateError && (
+              <div style={{ padding: "10px 1.5rem", background: "rgba(239,68,68,0.1)", borderBottom: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <AlertTriangle size={14} />
+                {generateError}
+              </div>
+            )}
 
             <div style={{ padding: "1.5rem" }}>
               {loading ? (

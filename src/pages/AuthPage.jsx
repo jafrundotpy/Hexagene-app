@@ -65,19 +65,29 @@ const AuthPage = ({ mode = "login" }) => {
       if (isLogin) {
         const token = data.access_token || data.token;
         localStorage.setItem("token", token);
-        login({ name: data.name || email.split("@")[0], email }, token);
+        login({ name: data.user?.name || email.split("@")[0], email }, token);
         
-        try {
-          const keyResponse = await fetch(`${API_URL}/api/generate-key`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" }
-          });
-          const keyData = await keyResponse.json();
-          if (keyData.api_key) {
-            localStorage.setItem("api_key", keyData.api_key);
+        // Auto-generate API key if one isn't already saved
+        const existingKey = localStorage.getItem("api_key");
+        if (!existingKey) {
+          try {
+            const keyResponse = await fetch(`${API_URL}/api/generate-key`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              }
+            });
+            const keyData = await keyResponse.json();
+            if (keyData.api_key) {
+              localStorage.setItem("api_key", keyData.api_key);
+              console.log("API key generated and saved:", keyData.api_key.substring(0, 12) + "...");
+            } else {
+              console.error("Key generation returned:", keyData);
+            }
+          } catch (keyErr) {
+            console.error("Failed to generate API key:", keyErr);
           }
-        } catch (keyErr) {
-          console.error("Failed to generate API key:", keyErr);
         }
 
         navigate("/dashboard/analysis", { replace: true });

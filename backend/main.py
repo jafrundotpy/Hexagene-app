@@ -214,22 +214,31 @@ async def generate_key(current_user=Depends(get_current_user)):
     """
     try:
         api_key = "hx_" + secrets.token_urlsafe(32)
+        user_id = current_user["id"]
 
-        supabase.table("api_keys").insert({
-            "user_id": current_user["id"],
-            "api_key": api_key,
-            "usage_count": 0,
-            "monthly_limit": 10000,
-            "is_active": True
-        }).execute()
+        # Try with all optional fields first, fall back to minimal insert
+        try:
+            supabase.table("api_keys").insert({
+                "user_id": user_id,
+                "api_key": api_key,
+                "usage_count": 0,
+                "monthly_limit": 10000,
+                "is_active": True
+            }).execute()
+        except Exception:
+            # Fallback: minimal insert if optional columns don't exist yet
+            supabase.table("api_keys").insert({
+                "user_id": user_id,
+                "api_key": api_key
+            }).execute()
 
-        print("Generated API key for user:", current_user["id"])
+        print("Generated API key for user:", user_id)
         return {"success": True, "api_key": api_key}
 
     except Exception as e:
         import traceback
         print("GENERATE KEY ERROR:", traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Key generation failed: {str(e)}")
 
 
 @app.get("/api/keys")
