@@ -16,6 +16,13 @@ import io
 import re
 import base64
 import json
+import tempfile
+import shutil
+import sys
+sys.path.append(str(Path(__file__).resolve().parent))
+from utils.ocr import extract_health_data
+import base64
+import json
 from openai import OpenAI
 
 # -----------------------------
@@ -299,69 +306,45 @@ def run_analysis_logic(key_data, data):
 # -----------------------------
 # IMAGE OCR ANALYZE
 # -----------------------------
-@app.post("/api/analyze-image")
-async def analyze_image(file: UploadFile = File(...), x_api_key: str = Header(None)):
+@app.post("/api/ocr-analyze")
+async def ocr_analyze(file: UploadFile = File(...), x_api_key: str = Header(None)):
     key_data = await verify_api_key(x_api_key)
+    temp_file_path = None
     try:
-        contents = await file.read()
-        base64_image = base64.b64encode(contents).decode('utf-8')
+        # Save file temporarily for easyocr to read
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_file_path = temp_file.name
+
+        extracted_data = extract_health_data(temp_file_path)
         
-        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        if not OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY environment variable is missing")
-            
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        if not extracted_data:
+            return {
+                "success": False,
+                "message": "Could not extract data from image. Please enter manually."
+            }
+
+        # The extracted keys need to be mapped if they differ from what the frontend expects
+        # ocr.py returns: sleep, steps, heart_rate, hrv, vo2_max, active_minutes
+        mapped_data = {
+            "sleepDuration": str(extracted_data.get("sleep")),
+            "dailySteps": str(extracted_data.get("steps")),
+            "restingHR": str(extracted_data.get("heart_rate")),
+            "hrv": str(extracted_data.get("hrv")),
+            "activeMinutes": str(extracted_data.get("active_minutes")),
+            "vo2max": str(extracted_data.get("vo2_max"))
+        }
         
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Extract the following health metrics from this screenshot. Return ONLY a valid JSON object with these exact keys (do not wrap in markdown): sleepDuration, dailySteps, restingHR, hrv, activeMinutes, vo2max. Use null if a value is not found."},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{file.content_type};base64,{base64_image}",
-                            },
-                        },
-                    ],
-                }
-            ],
-            max_tokens=300,
-        )
-        
-        extracted_text = response.choices[0].message.content.strip()
-        
-        # Robustly find JSON block in case OpenAI includes conversational text
-        json_match = re.search(r'\{.*\}', extracted_text, re.DOTALL)
-        if json_match:
-            extracted_text = json_match.group(0)
-            
-        try:
-            extracted_data = json.loads(extracted_text)
-        except Exception as e:
-            logger.error(f"JSON Parse Error. Raw text: {extracted_text}")
-            raise ValueError(f"Failed to parse JSON from OpenAI: {str(e)}")
-        
-        # Clean up nulls and non-number strings safely
-        cleaned_data = {}
-        for k, v in extracted_data.items():
-            if v is not None and str(v).lower() not in ["null", "none", "n/a", ""]:
-                # strip out any non-numeric chars except decimal points
-                cleaned_str = re.sub(r'[^\d.]', '', str(v))
-                if cleaned_str:
-                    cleaned_data[k] = cleaned_str
-                    
-        extracted_data = cleaned_data
+        # Clean up nulls
+        mapped_data = {k: v for k, v in mapped_data.items() if v != 'None'}
 
         patient_data = {
-            "sleepDuration": extracted_data.get("sleepDuration", "7.5"),
-            "dailySteps": extracted_data.get("dailySteps", "6000"),
-            "restingHR": extracted_data.get("restingHR", "60"),
-            "hrv": extracted_data.get("hrv", "50"),
-            "activeMinutes": extracted_data.get("activeMinutes", "30"),
-            "vo2max": extracted_data.get("vo2max", "35"),
+            "sleepDuration": mapped_data.get("sleepDuration", "7.5"),
+            "dailySteps": mapped_data.get("dailySteps", "6000"),
+            "restingHR": mapped_data.get("restingHR", "60"),
+            "hrv": mapped_data.get("hrv", "50"),
+            "activeMinutes": mapped_data.get("activeMinutes", "30"),
+            "vo2max": mapped_data.get("vo2max", "35"),
             "age": "30",
             "sex": "M",
             "albumin": "4.2",
@@ -375,13 +358,20 @@ async def analyze_image(file: UploadFile = File(...), x_api_key: str = Header(No
             "sleepDebt": "0"
         }
         
-        # Merge extracted data over defaults
-        for k, v in extracted_data.items():
+        # Merge mapped data over defaults
+        for k, v in mapped_data.items():
             patient_data[k] = v
 
         analysis_response = run_analysis_logic(key_data, patient_data)
-        analysis_response["extracted_data"] = extracted_data
+        analysis_response["extracted_data"] = mapped_data
         return analysis_response
+
+    except Exception as e:
+        logger.error(f"Image analyze error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
     except Exception as e:
         logger.error(f"Image analyze error: {str(e)}")

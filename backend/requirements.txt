@@ -8,4 +8,6 @@ bcrypt
 python-jose
 Pillow
 python-multipart
-openai
+easyocr
+opencv-python-headless
+numpy

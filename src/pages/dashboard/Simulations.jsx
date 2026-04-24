@@ -371,7 +371,7 @@ const Simulations = () => {
         const formData = new FormData();
         formData.append("file", uploadedImage);
         
-        response = await fetch(`${API_BASE}/api/analyze-image`, {
+        response = await fetch(`${API_BASE}/api/ocr-analyze`, {
           method: "POST",
           headers: {
             "x-api-key": apiKey
