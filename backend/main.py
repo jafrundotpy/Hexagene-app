@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -11,6 +11,10 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase_client import supabase
+import pytesseract
+from PIL import Image
+import io
+import re
 
 # -----------------------------
 # CONFIG
@@ -168,129 +172,191 @@ async def generate_key():
 @app.post("/api/analyze")
 async def analyze(request: dict, key_data=Depends(verify_api_key)):
     try:
-        # -----------------------------
-        # LOGGING (SAFE)
-        # -----------------------------
-        try:
-            supabase.table("usage_logs").insert({
-                "user_id": key_data["user_id"],
-                "endpoint": "/api/analyze"
-            }).execute()
-        except Exception as e:
-            print("LOG ERROR:", e)
-
-        # -----------------------------
-        # INPUT
-        # -----------------------------
-        data = request.get("patient_data", request)
-
-        def safe_float(val, default):
-            try:
-                if val is None or val == "":
-                    return default
-                return float(val)
-            except (ValueError, TypeError):
-                return default
-
-        try:
-            hba1c_raw = data.get("hba1c")
-            crp_raw = data.get("crp")
-            
-            if hba1c_raw is None or crp_raw is None or hba1c_raw == "" or crp_raw == "":
-                hba1c = 5.9
-                crp = 2.1
-            else:
-                hba1c = float(hba1c_raw)
-                crp = float(crp_raw)
-        except (ValueError, TypeError):
-            hba1c = 5.9
-            crp = 2.1
-
-        albumin = safe_float(data.get("albumin"), 4.0)
-        egfr = safe_float(data.get("egfr"), 90.0)
-        triglycerides = safe_float(data.get("triglycerides"), 120.0)
-        rdw = safe_float(data.get("rdw"), 13.0)
-        uric_acid = safe_float(data.get("uric_acid"), 5.0)
-
-        # -----------------------------
-        # BASE SCORES
-        # -----------------------------
-        inflammation = clamp(100 - (crp * 20))
-        metabolism = clamp(100 - (hba1c * 10))
-        structural = clamp(albumin * 20)
-        organ = clamp(egfr)
-        cellular = clamp(100 - (rdw * 5))
-        biochemical = clamp(100 - (uric_acid * 10))
-
-        # -----------------------------
-        # RELATIONSHIPS (CORE LOGIC)
-        # -----------------------------
-        metabolism -= (inflammation * 0.1)
-        organ -= (inflammation * 0.1)
-        cellular -= (inflammation * 0.15)
-
-        biochemical -= (metabolism * 0.05)
-
-        # Clamp again after interactions
-        inflammation = clamp(inflammation)
-        metabolism = clamp(metabolism)
-        structural = clamp(structural)
-        organ = clamp(organ)
-        cellular = clamp(cellular)
-        biochemical = clamp(biochemical)
-
-        # -----------------------------
-        # WEIGHT SYSTEM
-        # -----------------------------
-        weights = {
-            "structural": 0.15,
-            "inflammation": 0.20,
-            "metabolism": 0.20,
-            "cellular": 0.15,
-            "organ": 0.15,
-            "biochemical": 0.15
-        }
-
-        final_score = (
-            structural * weights["structural"] +
-            inflammation * weights["inflammation"] +
-            metabolism * weights["metabolism"] +
-            cellular * weights["cellular"] +
-            organ * weights["organ"] +
-            biochemical * weights["biochemical"]
-        )
-
-        final_score = round(clamp(final_score), 2)
-
-        # -----------------------------
-        # RESPONSE
-        # -----------------------------
-        result = {
-            "health_score": final_score,
-            "axes": {
-                "structural_integrity": round(structural, 2),
-                "inflammation": round(inflammation, 2),
-                "metabolism": round(metabolism, 2),
-                "cellular_stress": round(cellular, 2),
-                "organ_function": round(organ, 2),
-                "biochemical_balance": round(biochemical, 2)
-            },
-            "status": (
-                "Optimal" if final_score > 80 else
-                "Moderate" if final_score > 60 else
-                "At Risk"
-            )
-        }
-
-        return {
-            "success": True,
-            "result": result,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        return run_analysis_logic(key_data, data)
 
     except Exception as e:
         logger.error(f"Analyze error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+def run_analysis_logic(key_data, data):
+    # -----------------------------
+    # LOGGING (SAFE)
+    # -----------------------------
+    try:
+        supabase.table("usage_logs").insert({
+            "user_id": key_data["user_id"],
+            "endpoint": "/api/analyze"
+        }).execute()
+    except Exception as e:
+        print("LOG ERROR:", e)
+
+    def safe_float(val, default):
+        try:
+            if val is None or val == "":
+                return default
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
+    try:
+        hba1c_raw = data.get("hba1c")
+        crp_raw = data.get("crp")
+        
+        if hba1c_raw is None or crp_raw is None or hba1c_raw == "" or crp_raw == "":
+            hba1c = 5.9
+            crp = 2.1
+        else:
+            hba1c = float(hba1c_raw)
+            crp = float(crp_raw)
+    except (ValueError, TypeError):
+        hba1c = 5.9
+        crp = 2.1
+
+    albumin = safe_float(data.get("albumin"), 4.0)
+    egfr = safe_float(data.get("egfr"), 90.0)
+    triglycerides = safe_float(data.get("triglycerides"), 120.0)
+    rdw = safe_float(data.get("rdw"), 13.0)
+    uric_acid = safe_float(data.get("uric_acid"), 5.0)
+
+    # -----------------------------
+    # BASE SCORES
+    # -----------------------------
+    inflammation = clamp(100 - (crp * 20))
+    metabolism = clamp(100 - (hba1c * 10))
+    structural = clamp(albumin * 20)
+    organ = clamp(egfr)
+    cellular = clamp(100 - (rdw * 5))
+    biochemical = clamp(100 - (uric_acid * 10))
+
+    # -----------------------------
+    # RELATIONSHIPS (CORE LOGIC)
+    # -----------------------------
+    metabolism -= (inflammation * 0.1)
+    organ -= (inflammation * 0.1)
+    cellular -= (inflammation * 0.15)
+
+    biochemical -= (metabolism * 0.05)
+
+    # Clamp again after interactions
+    inflammation = clamp(inflammation)
+    metabolism = clamp(metabolism)
+    structural = clamp(structural)
+    organ = clamp(organ)
+    cellular = clamp(cellular)
+    biochemical = clamp(biochemical)
+
+    # -----------------------------
+    # WEIGHT SYSTEM
+    # -----------------------------
+    weights = {
+        "structural": 0.15,
+        "inflammation": 0.20,
+        "metabolism": 0.20,
+        "cellular": 0.15,
+        "organ": 0.15,
+        "biochemical": 0.15
+    }
+
+    final_score = (
+        structural * weights["structural"] +
+        inflammation * weights["inflammation"] +
+        metabolism * weights["metabolism"] +
+        cellular * weights["cellular"] +
+        organ * weights["organ"] +
+        biochemical * weights["biochemical"]
+    )
+
+    final_score = round(clamp(final_score), 2)
+
+    # -----------------------------
+    # RESPONSE
+    # -----------------------------
+    result = {
+        "health_score": final_score,
+        "axes": {
+            "structural_integrity": round(structural, 2),
+            "inflammation": round(inflammation, 2),
+            "metabolism": round(metabolism, 2),
+            "cellular_stress": round(cellular, 2),
+            "organ_function": round(organ, 2),
+            "biochemical_balance": round(biochemical, 2)
+        },
+        "status": (
+            "Optimal" if final_score > 80 else
+            "Moderate" if final_score > 60 else
+            "At Risk"
+        )
+    }
+
+    return {
+        "success": True,
+        "result": result,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+# -----------------------------
+# IMAGE OCR ANALYZE
+# -----------------------------
+@app.post("/api/analyze-image")
+async def analyze_image(file: UploadFile = File(...), x_api_key: str = Header(None)):
+    key_data = await verify_api_key(x_api_key)
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents))
+        
+        # Use Tesseract OCR
+        text = pytesseract.image_to_string(image)
+        
+        # Regex patterns to find specific values
+        patterns = {
+            "sleepDuration": r"(?i)sleep.*?(\d+(?:\.\d+)?)",
+            "dailySteps": r"(?i)steps.*?(\d{1,3}(?:,\d{3})*|\d+)",
+            "restingHR": r"(?i)resting.*?hr.*?(\d+)",
+            "hrv": r"(?i)hrv.*?(\d+)",
+            "activeMinutes": r"(?i)active.*?(\d+)",
+            "vo2max": r"(?i)vo2.*?(\d+)"
+        }
+        
+        extracted_data = {}
+        for key, pattern in patterns.items():
+            match = re.search(pattern, text)
+            if match:
+                val = match.group(1).replace(',', '')
+                extracted_data[key] = val
+                
+        patient_data = {
+            "sleepDuration": extracted_data.get("sleepDuration", "7.5"),
+            "dailySteps": extracted_data.get("dailySteps", "6000"),
+            "restingHR": extracted_data.get("restingHR", "60"),
+            "hrv": extracted_data.get("hrv", "50"),
+            "activeMinutes": extracted_data.get("activeMinutes", "30"),
+            "vo2max": extracted_data.get("vo2max", "35"),
+            "age": "30",
+            "sex": "M",
+            "albumin": "4.2",
+            "crp": "1.5",
+            "hba1c": "5.4",
+            "egfr": "90",
+            "rdw": "13.0",
+            "uricAcid": "5.0",
+            "recoveryScore": "75",
+            "sleepScore": "80",
+            "sleepDebt": "0"
+        }
+        
+        # Merge extracted data over defaults
+        for k, v in extracted_data.items():
+            patient_data[k] = v
+
+        response = run_analysis_logic(key_data, patient_data)
+        response["extracted_data"] = extracted_data
+        return response
+
+    except Exception as e:
+        logger.error(f"Image analyze error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 # -----------------------------
 # ROOT

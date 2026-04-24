@@ -6,3 +6,6 @@ supabase==2.4.3
 python-dotenv
 bcrypt
 python-jose
+pytesseract
+Pillow
+python-multipart

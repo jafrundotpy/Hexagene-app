@@ -350,13 +350,13 @@ const Simulations = () => {
   const [uploading,setUploading] = useState(false);
   const [uploadMsg,setUploadMsg] = useState("");
   const [dragOver,setDragOver] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState(null);
   const fileRef = useRef();
 
   const updateField = (key) => (val) => setForm(f=>({...f,[key]:val}));
 
   const handleRunAnalysis = async () => {
     try {
-      console.log("Form data:", form);
       const apiKey = localStorage.getItem("api_key");
 
       if (!apiKey) {
@@ -364,16 +364,33 @@ const Simulations = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE}/api/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey
-        },
-        body: JSON.stringify({
-          patient_data: form
-        })
-      });
+      let response;
+
+      if (uploadedImage) {
+        setUploadMsg("🧬 Analyzing image and extracting data...");
+        const formData = new FormData();
+        formData.append("file", uploadedImage);
+        
+        response = await fetch(`${API_BASE}/api/analyze-image`, {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey
+          },
+          body: formData
+        });
+      } else {
+        console.log("Form data:", form);
+        response = await fetch(`${API_BASE}/api/analyze`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey
+          },
+          body: JSON.stringify({
+            patient_data: form
+          })
+        });
+      }
 
       if (!response.ok) {
         const err = await response.text();
@@ -381,6 +398,12 @@ const Simulations = () => {
       }
 
       const data = await response.json();
+
+      if (data.extracted_data) {
+        console.log("Extracted Data:", data.extracted_data);
+        setUploadMsg(`✅ Extracted data: ${Object.keys(data.extracted_data).join(", ")}`);
+        setForm(prev => ({...prev, ...data.extracted_data}));
+      }
 
       if (data?.result?.axes) {
         const axes = data.result.axes;
@@ -399,13 +422,15 @@ const Simulations = () => {
         setRiskScore(avgScore);
         setAnalysisData(data.result);
         setAnalysisRun(true);
+        setUploadedImage(null);
 
         console.log("Analysis result:", data);
       }
 
     } catch (err) {
       console.error("Analyze error:", err);
-      alert("Backend connection failed");
+      alert("Backend connection failed: " + err.message);
+      setUploadMsg(`⚠️ Error: ${err.message}`);
     }
   };
 
@@ -416,40 +441,10 @@ const Simulations = () => {
     setAnalysisRun(true);
   };
 
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = (file) => {
     if(!file) return;
-    setUploading(true);
-    setUploadMsg("📸 Reading screenshot...");
-    try {
-      const base64 = await new Promise((res,rej)=>{
-        const reader=new FileReader();
-        reader.onload=()=>res(reader.result.split(",")[1]);
-        reader.onerror=rej;
-        reader.readAsDataURL(file);
-      });
-      setUploadMsg("🧬 Extracting health data...");
-      const response = await fetch("https://hexagene-app.onrender.com/extract-screenshot",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","Accept":"application/json"},
-        body:JSON.stringify({image_data:base64,media_type:file.type||"image/jpeg"})
-      });
-      const text = await response.text();
-      let result;
-      try{result=JSON.parse(text);}catch{setUploadMsg("⚠️ Unexpected server response.");setUploading(false);return;}
-      if(!response.ok){setUploadMsg(`⚠️ ${result.detail||"Extraction failed"}`);setUploading(false);return;}
-      const extracted=result.data||{};
-      const filledCount=result.filled_count||0;
-      const filledFields=result.filled_fields||[];
-      if(filledCount===0){setUploadMsg("⚠️ No data found. Make sure numbers are visible in screenshot.");setUploading(false);return;}
-      setForm(prev=>{
-        const updated={...prev};
-        Object.entries(extracted).forEach(([k,v])=>{if(v!==""&&v!==null&&v!==undefined)updated[k]=String(v);});
-        return updated;
-      });
-      const labelMap={sleepScore:"Sleep Score",sleepDuration:"Sleep Duration",dailySteps:"Daily Steps",restingHR:"Resting HR",hrv:"HRV",recoveryScore:"Recovery Score",activeMinutes:"Active Minutes",vo2max:"VO2 Max",sleepDebt:"Sleep Debt",age:"Age",sex:"Sex",activityLevel:"Activity Level",albumin:"Albumin",crp:"CRP",hba1c:"HbA1c",egfr:"eGFR",rdw:"RDW",uricAcid:"Uric Acid"};
-      const names=filledFields.map(f=>labelMap[f]||f).join(", ");
-      setUploadMsg(`✅ Extracted ${filledCount} field${filledCount>1?"s":""}: ${names}`);
-    }catch(err){setUploadMsg(`⚠️ ${err.message||"Upload failed."}`);} finally{setUploading(false);}
+    setUploadedImage(file);
+    setUploadMsg(`📸 Image loaded: ${file.name}. Click "Run Complete Analysis" to proceed.`);
   };
 
   const tabStyle = (id) => ({
