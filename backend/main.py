@@ -1,29 +1,60 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile
+"""
+HexaGene API — Production Backend
+==================================
+
+POST /api/analyze
+Headers: x-api-key: hx_xxxxx
+Body:
+{
+  "patient_data": {
+    "age": 38,
+    "sex": "F",
+    "crp": 1.6,
+    "hba1c": 5.8,
+    "albumin": 4.2,
+    "egfr": 90,
+    "rdw": 13.0,
+    "uric_acid": 5.0
+  }
+}
+
+Example cURL:
+curl -X POST "https://hexagene-app.onrender.com/api/analyze" \
+  -H "x-api-key: hx_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patient_data": {
+      "age": 38,
+      "sex": "F",
+      "crp": 1.6,
+      "hba1c": 5.8,
+      "albumin": 4.2,
+      "egfr": 90,
+      "rdw": 13.0,
+      "uric_acid": 5.0
+    }
+  }'
+"""
+
+from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-import os, uuid, secrets
+import os, uuid, secrets, time
+from collections import defaultdict
 
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase_client import supabase
-from PIL import Image
-import io
 import re
-import base64
-import json
 import tempfile
 import shutil
 import sys
 sys.path.append(str(Path(__file__).resolve().parent))
-from utils.ocr import extract_health_data
-import base64
-import json
-from openai import OpenAI
 
 # -----------------------------
 # CONFIG
@@ -50,6 +81,26 @@ if not SECRET_KEY or not ALGORITHM:
     raise ValueError("SECRET_KEY and ALGORITHM must be set")
 
 security = HTTPBearer(auto_error=False)
+
+# -----------------------------
+# RATE LIMITER (in-memory)
+# Max 100 req/min per API key
+# -----------------------------
+_rate_limit_store: dict = defaultdict(list)
+RATE_LIMIT = 100
+RATE_WINDOW = 60  # seconds
+
+def check_rate_limit(api_key: str):
+    now = time.time()
+    window_start = now - RATE_WINDOW
+    # Prune old timestamps
+    _rate_limit_store[api_key] = [t for t in _rate_limit_store[api_key] if t > window_start]
+    if len(_rate_limit_store[api_key]) >= RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail={"success": False, "message": "Rate limit exceeded. Max 100 requests per minute."}
+        )
+    _rate_limit_store[api_key].append(now)
 
 # -----------------------------
 # MODELS
@@ -92,16 +143,22 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def verify_api_key(x_api_key: str = Header(None)):
-    print("API KEY:", x_api_key)
     if not x_api_key:
-        raise HTTPException(status_code=401, detail="Missing API Key")
+        raise HTTPException(
+            status_code=401,
+            detail={"success": False, "message": "Missing API key"}
+        )
 
     res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).execute()
 
     if not res.data:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
+        raise HTTPException(
+            status_code=401,
+            detail={"success": False, "message": "Invalid API key"}
+        )
 
-    return res.data[0]  # contains user_id (VALID UUID)
+    check_rate_limit(x_api_key)
+    return res.data[0]  # contains user_id
 
 # -----------------------------
 # AUTH
@@ -147,16 +204,13 @@ async def login(user: UserLogin):
 # -----------------------------
 @app.post("/api/generate-key")
 async def generate_key():
-    import uuid
     import traceback
 
-    # create valid UUID user
     user_id = str(uuid.uuid4())
     key = "hx_" + uuid.uuid4().hex
     random_email = f"demo_{uuid.uuid4().hex[:8]}@hexagene.com"
 
     try:
-        # insert user
         supabase.table("users").insert({
             "id": user_id,
             "email": random_email,
@@ -164,7 +218,6 @@ async def generate_key():
             "password": "no_password"
         }).execute()
 
-        # insert API key linked to user
         supabase.table("api_keys").insert({
             "api_key": key,
             "user_id": user_id
@@ -176,13 +229,20 @@ async def generate_key():
         raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
 # -----------------------------
+# HEALTH CHECK
+# -----------------------------
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
+
+# -----------------------------
 # ANALYZE (ADVANCED ENGINE)
 # -----------------------------
 @app.post("/api/analyze")
-async def analyze(request: dict, key_data=Depends(verify_api_key)):
+async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
     try:
+        data = request.patient_data
         return run_analysis_logic(key_data, data)
-
     except Exception as e:
         logger.error(f"Analyze error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -207,10 +267,12 @@ def run_analysis_logic(key_data, data):
         except (ValueError, TypeError):
             return default
 
+    logger.info(f"Input data: {data}")
+
     try:
         hba1c_raw = data.get("hba1c")
         crp_raw = data.get("crp")
-        
+
         if hba1c_raw is None or crp_raw is None or hba1c_raw == "" or crp_raw == "":
             hba1c = 5.9
             crp = 2.1
@@ -223,161 +285,86 @@ def run_analysis_logic(key_data, data):
 
     albumin = safe_float(data.get("albumin"), 4.0)
     egfr = safe_float(data.get("egfr"), 90.0)
-    triglycerides = safe_float(data.get("triglycerides"), 120.0)
     rdw = safe_float(data.get("rdw"), 13.0)
-    uric_acid = safe_float(data.get("uric_acid"), 5.0)
+    uric_acid = safe_float(data.get("uric_acid") or data.get("uricAcid"), 5.0)
 
     # -----------------------------
     # BASE SCORES
     # -----------------------------
-    inflammation = clamp(100 - (crp * 20))
-    metabolism = clamp(100 - (hba1c * 10))
+    inflammatory = clamp(100 - (crp * 20))
+    metabolic = clamp(100 - (hba1c * 10))
     structural = clamp(albumin * 20)
-    organ = clamp(egfr)
-    cellular = clamp(100 - (rdw * 5))
-    biochemical = clamp(100 - (uric_acid * 10))
+    kinetic = clamp(egfr)
+    redox = clamp(100 - (rdw * 5))
+    balance = clamp(100 - (uric_acid * 10))
 
     # -----------------------------
     # RELATIONSHIPS (CORE LOGIC)
     # -----------------------------
-    metabolism -= (inflammation * 0.1)
-    organ -= (inflammation * 0.1)
-    cellular -= (inflammation * 0.15)
-
-    biochemical -= (metabolism * 0.05)
+    metabolic -= (inflammatory * 0.1)
+    kinetic -= (inflammatory * 0.1)
+    redox -= (inflammatory * 0.15)
+    balance -= (metabolic * 0.05)
 
     # Clamp again after interactions
-    inflammation = clamp(inflammation)
-    metabolism = clamp(metabolism)
+    inflammatory = clamp(inflammatory)
+    metabolic = clamp(metabolic)
     structural = clamp(structural)
-    organ = clamp(organ)
-    cellular = clamp(cellular)
-    biochemical = clamp(biochemical)
+    kinetic = clamp(kinetic)
+    redox = clamp(redox)
+    balance = clamp(balance)
 
     # -----------------------------
     # WEIGHT SYSTEM
     # -----------------------------
     weights = {
         "structural": 0.15,
-        "inflammation": 0.20,
-        "metabolism": 0.20,
-        "cellular": 0.15,
-        "organ": 0.15,
-        "biochemical": 0.15
+        "inflammatory": 0.20,
+        "metabolic": 0.20,
+        "redox": 0.15,
+        "kinetic": 0.15,
+        "balance": 0.15
     }
 
-    final_score = (
+    risk_score = (
         structural * weights["structural"] +
-        inflammation * weights["inflammation"] +
-        metabolism * weights["metabolism"] +
-        cellular * weights["cellular"] +
-        organ * weights["organ"] +
-        biochemical * weights["biochemical"]
+        inflammatory * weights["inflammatory"] +
+        metabolic * weights["metabolic"] +
+        redox * weights["redox"] +
+        kinetic * weights["kinetic"] +
+        balance * weights["balance"]
     )
 
-    final_score = round(clamp(final_score), 2)
+    risk_score = round(clamp(risk_score), 2)
+
+    status = (
+        "Optimal" if risk_score > 80 else
+        "Moderate" if risk_score > 60 else
+        "At Risk"
+    )
+
+    s21_state = status.lower().replace(" ", "_")
+
+    logger.info(f"Computed risk_score={risk_score}, status={status}")
 
     # -----------------------------
-    # RESPONSE
+    # STANDARDIZED RESPONSE
     # -----------------------------
-    result = {
-        "health_score": final_score,
-        "axes": {
-            "structural_integrity": round(structural, 2),
-            "inflammation": round(inflammation, 2),
-            "metabolism": round(metabolism, 2),
-            "cellular_stress": round(cellular, 2),
-            "organ_function": round(organ, 2),
-            "biochemical_balance": round(biochemical, 2)
-        },
-        "status": (
-            "Optimal" if final_score > 80 else
-            "Moderate" if final_score > 60 else
-            "At Risk"
-        )
-    }
-
     return {
         "success": True,
-        "result": result,
+        "risk_score": risk_score,
+        "axes": {
+            "inflammatory": round(inflammatory, 2),
+            "metabolic": round(metabolic, 2),
+            "redox": round(redox, 2),
+            "kinetic": round(kinetic, 2),
+            "balance": round(balance, 2),
+            "structural": round(structural, 2),
+        },
+        "s21_state": s21_state,
+        "status": status,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
-
-# -----------------------------
-# IMAGE OCR ANALYZE
-# -----------------------------
-@app.post("/api/ocr-analyze")
-async def ocr_analyze(file: UploadFile = File(...), x_api_key: str = Header(None)):
-    key_data = await verify_api_key(x_api_key)
-    temp_file_path = None
-    try:
-        # Save file temporarily for easyocr to read
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
-            shutil.copyfileobj(file.file, temp_file)
-            temp_file_path = temp_file.name
-
-        extracted_data = extract_health_data(temp_file_path)
-        
-        if not extracted_data:
-            return {
-                "success": False,
-                "message": "Could not extract data from image. Please enter manually."
-            }
-
-        # The extracted keys need to be mapped if they differ from what the frontend expects
-        # ocr.py returns: sleep, steps, heart_rate, hrv, vo2_max, active_minutes
-        mapped_data = {
-            "sleepDuration": str(extracted_data.get("sleep")),
-            "dailySteps": str(extracted_data.get("steps")),
-            "restingHR": str(extracted_data.get("heart_rate")),
-            "hrv": str(extracted_data.get("hrv")),
-            "activeMinutes": str(extracted_data.get("active_minutes")),
-            "vo2max": str(extracted_data.get("vo2_max"))
-        }
-        
-        # Clean up nulls
-        mapped_data = {k: v for k, v in mapped_data.items() if v != 'None'}
-
-        patient_data = {
-            "sleepDuration": mapped_data.get("sleepDuration", "7.5"),
-            "dailySteps": mapped_data.get("dailySteps", "6000"),
-            "restingHR": mapped_data.get("restingHR", "60"),
-            "hrv": mapped_data.get("hrv", "50"),
-            "activeMinutes": mapped_data.get("activeMinutes", "30"),
-            "vo2max": mapped_data.get("vo2max", "35"),
-            "age": "30",
-            "sex": "M",
-            "albumin": "4.2",
-            "crp": "1.5",
-            "hba1c": "5.4",
-            "egfr": "90",
-            "rdw": "13.0",
-            "uricAcid": "5.0",
-            "recoveryScore": "75",
-            "sleepScore": "80",
-            "sleepDebt": "0"
-        }
-        
-        # Merge mapped data over defaults
-        for k, v in mapped_data.items():
-            patient_data[k] = v
-
-        analysis_response = run_analysis_logic(key_data, patient_data)
-        analysis_response["extracted_data"] = mapped_data
-        return analysis_response
-
-    except Exception as e:
-        logger.error(f"Image analyze error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-
-    except Exception as e:
-        logger.error(f"Image analyze error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 
 # -----------------------------
 # ROOT

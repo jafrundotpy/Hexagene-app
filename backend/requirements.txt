@@ -6,8 +6,4 @@ supabase==2.4.3
 python-dotenv
 bcrypt
 python-jose
-Pillow
 python-multipart
-easyocr
-opencv-python-headless
-numpy

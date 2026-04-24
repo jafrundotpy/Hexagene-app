@@ -348,9 +348,8 @@ const Simulations = () => {
   const [analysisData,setAnalysisData] = useState(null);
   const [analysisRun,setAnalysisRun] = useState(false);
   const [uploading,setUploading] = useState(false);
-  const [uploadMsg,setUploadMsg] = useState("");
+  const [uploadMsg,setUploadMsg] = useState("🚧 Screenshot OCR feature is under development. Please enter data manually.");
   const [dragOver,setDragOver] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState(null);
   const fileRef = useRef();
 
   const updateField = (key) => (val) => setForm(f=>({...f,[key]:val}));
@@ -364,33 +363,17 @@ const Simulations = () => {
         return;
       }
 
-      let response;
-
-      if (uploadedImage) {
-        setUploadMsg("Extracting data from image...");
-        const formData = new FormData();
-        formData.append("file", uploadedImage);
-        
-        response = await fetch(`${API_BASE}/api/ocr-analyze`, {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey
-          },
-          body: formData
-        });
-      } else {
-        console.log("Form data:", form);
-        response = await fetch(`${API_BASE}/api/analyze`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey
-          },
-          body: JSON.stringify({
-            patient_data: form
-          })
-        });
-      }
+      console.log("Form data:", form);
+      const response = await fetch(`${API_BASE}/api/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey
+        },
+        body: JSON.stringify({
+          patient_data: form
+        })
+      });
 
       if (!response.ok) {
         const err = await response.text();
@@ -398,39 +381,32 @@ const Simulations = () => {
       }
 
       const data = await response.json();
+      console.log("Analysis result:", data);
 
-      if (data.extracted_data) {
-        console.log("Extracted Data:", data.extracted_data);
-        setUploadMsg(`✅ Extracted data: ${Object.keys(data.extracted_data).join(", ")}`);
-        setForm(prev => ({...prev, ...data.extracted_data}));
-      }
-
-      if (data?.result?.axes) {
-        const axes = data.result.axes;
+      if (data?.axes) {
+        const axes = data.axes;
 
         const avgScore = Math.round(
           (
-            axes.structural_integrity +
-            axes.inflammation +
-            axes.metabolism +
-            axes.cellular_stress +
-            axes.organ_function +
-            axes.biochemical_balance
+            axes.inflammatory +
+            axes.metabolic +
+            axes.redox +
+            axes.kinetic +
+            axes.balance +
+            axes.structural
           ) / 6
         );
 
-        setRiskScore(avgScore);
-        setAnalysisData(data.result);
+        setRiskScore(data.risk_score ?? avgScore);
+        setAnalysisData(data);
         setAnalysisRun(true);
-        setUploadedImage(null);
 
-        console.log("Analysis result:", data);
+        console.log("Extracted axes:", axes);
       }
 
     } catch (err) {
       console.error("Analyze error:", err);
       alert("Backend connection failed: " + err.message);
-      setUploadMsg(`⚠️ Error: ${err.message}`);
     }
   };
 
@@ -442,9 +418,8 @@ const Simulations = () => {
   };
 
   const handleFileUpload = (file) => {
-    if(!file) return;
-    setUploadedImage(file);
-    setUploadMsg(`📸 Image loaded: ${file.name}. Click "Run Complete Analysis" to proceed.`);
+    // OCR feature is temporarily disabled
+    setUploadMsg("🚧 Screenshot OCR feature is under development. Please enter data manually.");
   };
 
   const tabStyle = (id) => ({
@@ -457,12 +432,12 @@ const Simulations = () => {
 
   const s21 = analysisData
   ? {
-      structural: analysisData.axes.structural_integrity,
-      inflammatory: analysisData.axes.inflammation,
-      metabolic: analysisData.axes.metabolism,
-      redox: analysisData.axes.cellular_stress,
-      kinetic: analysisData.axes.organ_function,
-      balance: analysisData.axes.biochemical_balance,
+      structural: analysisData.axes?.structural ?? 0,
+      inflammatory: analysisData.axes?.inflammatory ?? 0,
+      metabolic: analysisData.axes?.metabolic ?? 0,
+      redox: analysisData.axes?.redox ?? 0,
+      kinetic: analysisData.axes?.kinetic ?? 0,
+      balance: analysisData.axes?.balance ?? 0,
     }
   : calcS21(form);
   const readiness = calcReadiness(form);
