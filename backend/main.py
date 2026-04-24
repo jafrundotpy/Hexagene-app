@@ -11,10 +11,12 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase_client import supabase
-import pytesseract
 from PIL import Image
 import io
 import re
+import base64
+import json
+from openai import OpenAI
 
 # -----------------------------
 # CONFIG
@@ -302,28 +304,42 @@ async def analyze_image(file: UploadFile = File(...), x_api_key: str = Header(No
     key_data = await verify_api_key(x_api_key)
     try:
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
+        base64_image = base64.b64encode(contents).decode('utf-8')
         
-        # Use Tesseract OCR
-        text = pytesseract.image_to_string(image)
+        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+        if not OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY environment variable is missing")
+            
+        client = OpenAI(api_key=OPENAI_API_KEY)
         
-        # Regex patterns to find specific values
-        patterns = {
-            "sleepDuration": r"(?i)sleep.*?(\d+(?:\.\d+)?)",
-            "dailySteps": r"(?i)steps.*?(\d{1,3}(?:,\d{3})*|\d+)",
-            "restingHR": r"(?i)resting.*?hr.*?(\d+)",
-            "hrv": r"(?i)hrv.*?(\d+)",
-            "activeMinutes": r"(?i)active.*?(\d+)",
-            "vo2max": r"(?i)vo2.*?(\d+)"
-        }
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract the following health metrics from this screenshot. Return ONLY a valid JSON object with these exact keys (do not wrap in markdown): sleepDuration, dailySteps, restingHR, hrv, activeMinutes, vo2max. Use null if a value is not found."},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{file.content_type};base64,{base64_image}",
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=300,
+        )
         
-        extracted_data = {}
-        for key, pattern in patterns.items():
-            match = re.search(pattern, text)
-            if match:
-                val = match.group(1).replace(',', '')
-                extracted_data[key] = val
-                
+        extracted_text = response.choices[0].message.content.strip()
+        if extracted_text.startswith("```json"):
+            extracted_text = extracted_text.split("```json")[1].split("```")[0].strip()
+            
+        extracted_data = json.loads(extracted_text)
+        
+        # Clean up nulls
+        extracted_data = {k: str(v) for k, v in extracted_data.items() if v is not None}
+
         patient_data = {
             "sleepDuration": extracted_data.get("sleepDuration", "7.5"),
             "dailySteps": extracted_data.get("dailySteps", "6000"),
@@ -348,9 +364,9 @@ async def analyze_image(file: UploadFile = File(...), x_api_key: str = Header(No
         for k, v in extracted_data.items():
             patient_data[k] = v
 
-        response = run_analysis_logic(key_data, patient_data)
-        response["extracted_data"] = extracted_data
-        return response
+        analysis_response = run_analysis_logic(key_data, patient_data)
+        analysis_response["extracted_data"] = extracted_data
+        return analysis_response
 
     except Exception as e:
         logger.error(f"Image analyze error: {str(e)}")

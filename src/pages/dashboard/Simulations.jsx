@@ -367,7 +367,7 @@ const Simulations = () => {
       let response;
 
       if (uploadedImage) {
-        setUploadMsg("🧬 Analyzing image and extracting data...");
+        setUploadMsg("Extracting data from image...");
         const formData = new FormData();
         formData.append("file", uploadedImage);
         
