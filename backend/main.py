@@ -143,13 +143,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def verify_api_key(x_api_key: str = Header(None)):
+    print("API KEY RECEIVED:", x_api_key)
     if not x_api_key:
         raise HTTPException(
             status_code=401,
             detail={"success": False, "message": "Missing API key"}
         )
 
-    res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).execute()
+    res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).eq("is_active", True).execute()
 
     if not res.data:
         raise HTTPException(
@@ -157,8 +158,11 @@ async def verify_api_key(x_api_key: str = Header(None)):
             detail={"success": False, "message": "Invalid API key"}
         )
 
+    key_data = res.data[0]
+    print("USER ID:", key_data["user_id"])
+
     check_rate_limit(x_api_key)
-    return res.data[0]  # contains user_id
+    return key_data
 
 # -----------------------------
 # AUTH
@@ -203,30 +207,54 @@ async def login(user: UserLogin):
 # API KEY
 # -----------------------------
 @app.post("/api/generate-key")
-async def generate_key():
-    import traceback
-
-    user_id = str(uuid.uuid4())
-    key = "hx_" + uuid.uuid4().hex
-    random_email = f"demo_{uuid.uuid4().hex[:8]}@hexagene.com"
-
+async def generate_key(current_user=Depends(get_current_user)):
+    """
+    Generate a new API key tied to the authenticated user.
+    Requires a valid JWT bearer token in the Authorization header.
+    """
     try:
-        supabase.table("users").insert({
-            "id": user_id,
-            "email": random_email,
-            "name": "API Key User",
-            "password": "no_password"
-        }).execute()
+        api_key = "hx_" + secrets.token_urlsafe(32)
 
         supabase.table("api_keys").insert({
-            "api_key": key,
-            "user_id": user_id
+            "user_id": current_user["id"],
+            "api_key": api_key,
+            "usage_count": 0,
+            "monthly_limit": 10000,
+            "is_active": True
         }).execute()
 
-        return {"api_key": key}
+        print("Generated API key for user:", current_user["id"])
+        return {"success": True, "api_key": api_key}
+
     except Exception as e:
+        import traceback
         print("GENERATE KEY ERROR:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+
+
+@app.get("/api/keys")
+async def get_user_keys(current_user=Depends(get_current_user)):
+    """
+    Return all API keys belonging to the authenticated user.
+    """
+    try:
+        res = supabase.table("api_keys").select("*") \
+            .eq("user_id", current_user["id"]) \
+            .eq("is_active", True) \
+            .execute()
+
+        keys = [
+            {
+                "api_key": k["api_key"],
+                "usage": k.get("usage_count", 0),
+                "limit": k.get("monthly_limit", 10000),
+                "created_at": k.get("created_at", "")[:10] if k.get("created_at") else ""
+            }
+            for k in res.data
+        ]
+        return {"success": True, "keys": keys}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------
 # HEALTH CHECK
@@ -242,7 +270,17 @@ def health_check():
 async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
     try:
         data = request.patient_data
-        return run_analysis_logic(key_data, data)
+        result = run_analysis_logic(key_data, data)
+
+        # Increment usage count
+        try:
+            supabase.table("api_keys").update({
+                "usage_count": key_data.get("usage_count", 0) + 1
+            }).eq("id", key_data["id"]).execute()
+        except Exception as e:
+            print("Usage increment error:", e)
+
+        return result
     except Exception as e:
         logger.error(f"Analyze error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

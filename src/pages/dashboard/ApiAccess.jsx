@@ -29,7 +29,8 @@ const ApiAccess = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        setKeys(data);
+        // Handle new {success, keys:[]} format
+        setKeys(Array.isArray(data) ? data : (data.keys || []));
       }
     } catch (err) {
       console.error("Failed to fetch keys", err);
@@ -51,6 +52,11 @@ const ApiAccess = () => {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
+        const data = await res.json();
+        // Save new key to localStorage so /api/analyze can use it
+        if (data.api_key) {
+          localStorage.setItem("api_key", data.api_key);
+        }
         await fetchKeys();
       }
     } catch (err) {
