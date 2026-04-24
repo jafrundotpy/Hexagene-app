@@ -40,6 +40,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header, File, UploadFile, R
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from typing import Dict, Any
 import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
@@ -115,7 +116,7 @@ class UserLogin(BaseModel):
     password: str
 
 class AnalysisRequest(BaseModel):
-    patient_data: dict
+    patient_data: Dict[str, Any]
 
 # -----------------------------
 # HELPERS
@@ -150,7 +151,11 @@ async def verify_api_key(x_api_key: str = Header(None)):
             detail={"success": False, "message": "Missing API key"}
         )
 
-    res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).eq("is_active", True).execute()
+    # Try with is_active filter first, fall back if column doesn't exist
+    try:
+        res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).eq("is_active", True).execute()
+    except Exception:
+        res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).execute()
 
     if not res.data:
         raise HTTPException(
@@ -277,8 +282,33 @@ def health_check():
 # -----------------------------
 @app.post("/api/analyze")
 async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
+    print("Incoming request:", request)
+
+    data = request.patient_data
+    print("Extracted patient_data:", data)
+
+    # --- Validation ---
+    def to_float(val, default=0.0):
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
+    crp = to_float(data.get("crp"))
+    hba1c = to_float(data.get("hba1c"))
+
+    if crp == 0.0 and "crp" in data:
+        raise HTTPException(status_code=400, detail="Invalid value for 'crp': must be a non-zero number")
+    if hba1c == 0.0 and "hba1c" in data:
+        raise HTTPException(status_code=400, detail="Invalid value for 'hba1c': must be a non-zero number")
+
+    if not data.get("crp") and not data.get("hba1c"):
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required fields: crp and hba1c"
+        )
+
     try:
-        data = request.patient_data
         result = run_analysis_logic(key_data, data)
 
         # Increment usage count
@@ -290,6 +320,8 @@ async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
             print("Usage increment error:", e)
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Analyze error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
