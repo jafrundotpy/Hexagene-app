@@ -332,13 +332,28 @@ async def analyze_image(file: UploadFile = File(...), x_api_key: str = Header(No
         )
         
         extracted_text = response.choices[0].message.content.strip()
-        if extracted_text.startswith("```json"):
-            extracted_text = extracted_text.split("```json")[1].split("```")[0].strip()
-            
-        extracted_data = json.loads(extracted_text)
         
-        # Clean up nulls
-        extracted_data = {k: str(v) for k, v in extracted_data.items() if v is not None}
+        # Robustly find JSON block in case OpenAI includes conversational text
+        json_match = re.search(r'\{.*\}', extracted_text, re.DOTALL)
+        if json_match:
+            extracted_text = json_match.group(0)
+            
+        try:
+            extracted_data = json.loads(extracted_text)
+        except Exception as e:
+            logger.error(f"JSON Parse Error. Raw text: {extracted_text}")
+            raise ValueError(f"Failed to parse JSON from OpenAI: {str(e)}")
+        
+        # Clean up nulls and non-number strings safely
+        cleaned_data = {}
+        for k, v in extracted_data.items():
+            if v is not None and str(v).lower() not in ["null", "none", "n/a", ""]:
+                # strip out any non-numeric chars except decimal points
+                cleaned_str = re.sub(r'[^\d.]', '', str(v))
+                if cleaned_str:
+                    cleaned_data[k] = cleaned_str
+                    
+        extracted_data = cleaned_data
 
         patient_data = {
             "sleepDuration": extracted_data.get("sleepDuration", "7.5"),
