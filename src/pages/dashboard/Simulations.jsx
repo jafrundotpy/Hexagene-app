@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const API_BASE = "https://your-backend-url.onrender.com";
+const API_BASE = "https://hexagene-app.onrender.com";
 
 const TABS = [
   { id: "input", icon: "📱", label: "Data Input" },
