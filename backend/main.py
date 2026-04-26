@@ -1,4 +1,4 @@
-"""
+﻿"""
 HexaGene API — Production Backend
 ==================================
 
@@ -56,6 +56,7 @@ import tempfile
 import shutil
 import sys
 sys.path.append(str(Path(__file__).resolve().parent))
+from utils.api_key import generate_api_key, hash_api_key, verify_api_key
 
 # -----------------------------
 # CONFIG
@@ -211,41 +212,42 @@ async def login(user: UserLogin):
 # -----------------------------
 # API KEY
 # -----------------------------
+
 @app.post("/api/generate-key")
 async def generate_key(current_user=Depends(get_current_user)):
-    """
-    Generate a new API key tied to the authenticated user.
-    Requires a valid JWT bearer token in the Authorization header.
-    """
     try:
-        api_key = "hx_" + secrets.token_urlsafe(32)
         user_id = current_user["id"]
 
-        # Try with all optional fields first, fall back to minimal insert
-        try:
-            supabase.table("api_keys").insert({
-                "user_id": user_id,
-                "api_key": api_key,
-                "usage_count": 0,
-                "monthly_limit": 10000,
-                "is_active": True
-            }).execute()
-        except Exception:
-            # Fallback: minimal insert if optional columns don't exist yet
-            supabase.table("api_keys").insert({
-                "user_id": user_id,
-                "api_key": api_key
-            }).execute()
+        # 🔍 check existing key
+        existing = supabase.table("api_keys").select("*").eq("user_id", user_id).execute()
 
-        print("Generated API key for user:", user_id)
-        return {"success": True, "api_key": api_key}
+        if existing.data:
+            return {
+                "success": True,
+                "api_key": "Already generated",
+                "message": "User already has API key"
+            }
+
+        # 🔐 generate new
+        raw_key = generate_api_key()
+        hashed_key = hash_api_key(raw_key)
+
+        supabase.table("api_keys").insert({
+            "user_id": user_id,
+            "api_key": hashed_key,
+            "usage_count": 0,
+            "monthly_limit": 10000,
+            "is_active": True
+        }).execute()
+
+        return {
+            "success": True,
+            "api_key": raw_key
+        }
 
     except Exception as e:
-        import traceback
-        print("GENERATE KEY ERROR:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Key generation failed: {str(e)}")
-
-
+    
 @app.get("/api/keys")
 async def get_user_keys(current_user=Depends(get_current_user)):
     """
