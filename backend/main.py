@@ -1,4 +1,4 @@
-﻿"""
+"""
 HexaGene API — Production Backend
 ==================================
 
@@ -41,7 +41,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Dict, Any
-import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 import os, uuid, secrets, time
@@ -56,7 +55,7 @@ import tempfile
 import shutil
 import sys
 sys.path.append(str(Path(__file__).resolve().parent))
-from utils.api_key import generate_api_key, hash_api_key, verify_api_key
+from utils.api_key import generate_api_key, hash_api_key, verify_api_key as _verify_api_key_helper
 
 # -----------------------------
 # CONFIG
@@ -126,9 +125,11 @@ def clamp(value):
     return max(0, min(100, value))
 
 def hash_password(p: str) -> str:
+    import bcrypt
     return bcrypt.hashpw(p.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(p: str, h: str) -> bool:
+    import bcrypt
     return bcrypt.checkpw(p.encode("utf-8")[:72], h.encode("utf-8"))
 
 def create_token(data):
@@ -145,18 +146,19 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def verify_api_key(x_api_key: str = Header(None)):
-    print("API KEY RECEIVED:", x_api_key)
     if not x_api_key:
         raise HTTPException(
             status_code=401,
             detail={"success": False, "message": "Missing API key"}
         )
 
-    # Try with is_active filter first, fall back if column doesn't exist
+    # Hash the incoming key — DB stores only SHA256 hashes
+    hashed_incoming = hash_api_key(x_api_key)
+
     try:
-        res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).eq("is_active", True).execute()
+        res = supabase.table("api_keys").select("*").eq("api_key", hashed_incoming).eq("is_active", True).execute()
     except Exception:
-        res = supabase.table("api_keys").select("*").eq("api_key", x_api_key).execute()
+        res = supabase.table("api_keys").select("*").eq("api_key", hashed_incoming).execute()
 
     if not res.data:
         raise HTTPException(
@@ -165,9 +167,9 @@ async def verify_api_key(x_api_key: str = Header(None)):
         )
 
     key_data = res.data[0]
-    print("USER ID:", key_data["user_id"])
+    logger.info(f"API key verified for user_id={key_data['user_id']}")
 
-    check_rate_limit(x_api_key)
+    check_rate_limit(hashed_incoming)
     return key_data
 
 # -----------------------------
@@ -215,39 +217,59 @@ async def login(user: UserLogin):
 
 @app.post("/api/generate-key")
 async def generate_key(current_user=Depends(get_current_user)):
+    """
+    Generate API key (1 per user).
+    Stores hashed version in DB.
+    Returns raw key ONLY once.
+    """
     try:
         user_id = current_user["id"]
 
-        # 🔍 check existing key
-        existing = supabase.table("api_keys").select("*").eq("user_id", user_id).execute()
+        # 🔍 Check if user already has active key
+        existing = supabase.table("api_keys") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .eq("is_active", True) \
+            .execute()
 
         if existing.data:
             return {
                 "success": True,
                 "api_key": "Already generated",
-                "message": "User already has API key"
+                "message": "User already has active API key"
             }
 
-        # 🔐 generate new
+        # 🔐 Generate new key
         raw_key = generate_api_key()
         hashed_key = hash_api_key(raw_key)
 
-        supabase.table("api_keys").insert({
+        # 🧾 Insert into DB
+        insert_response = supabase.table("api_keys").insert({
             "user_id": user_id,
             "api_key": hashed_key,
             "usage_count": 0,
             "monthly_limit": 10000,
-            "is_active": True
+            "is_active": True,
+            "created_at": datetime.utcnow().isoformat()
         }).execute()
+
+        if not insert_response.data:
+            raise Exception("Failed to insert API key")
 
         return {
             "success": True,
-            "api_key": raw_key
+            "api_key": raw_key,
+            "message": "API key generated successfully (store it safely)"
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Key generation failed: {str(e)}")
-    
+        import traceback
+        print("GENERATE KEY ERROR:", traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Key generation failed: {str(e)}"
+        )
+            
 @app.get("/api/keys")
 async def get_user_keys(current_user=Depends(get_current_user)):
     """

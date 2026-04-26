@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HexaGene — Project Status Report</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      font-size: 13px;
+    }
+
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      background: white;
+      min-height: 100vh;
+      padding: 48px 56px;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 3px solid #0ea5e9;
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+    }
+
+    .logo-area h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0ea5e9;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-area .tagline {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+
+    .meta {
+      text-align: right;
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.8;
+    }
+
+    .meta strong {
+      color: #1e293b;
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-live { background: #dcfce7; color: #16a34a; }
+    .badge-pending { background: #fef9c3; color: #a16207; }
+    .badge-paused { background: #fee2e2; color: #dc2626; }
+
+    /* SECTIONS */
+    .section { margin-bottom: 36px; }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #0ea5e9;
+      margin-bottom: 14px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* SUMMARY BOXES */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+
+    .summary-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 18px;
+      border-left: 4px solid #0ea5e9;
+    }
+
+    .summary-box .label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #64748b;
+    }
+
+    .summary-box .value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0ea5e9;
+      margin: 6px 0 4px;
+    }
+
+    .summary-box .sub {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* TABLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    th {
+      background: #f1f5f9;
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #475569;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* CODE BLOCK */
+    .code-block {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 18px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 11.5px;
+      color: #94a3b8;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .code-block .comment { color: #475569; }
+    .code-block .key { color: #7dd3fc; }
+    .code-block .val { color: #86efac; }
+    .code-block .url { color: #fbbf24; }
+
+    /* FEATURE LIST */
+    .feature-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .feature-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #0ea5e9, #7c3aed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 13px;
+    }
+
+    .feature-text .title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 2px;
+    }
+
+    .feature-text .desc {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* AXES */
+    .axes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .axis-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .axis-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .axis-icon { font-size: 20px; margin: 6px 0; }
+
+    /* FOOTER */
+    .footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .footer strong { color: #0ea5e9; }
+
+    /* ENDPOINT ROW */
+    .endpoint-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 8px;
+    }
+
+    .method {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      min-width: 42px;
+      text-align: center;
+    }
+
+    .method-post { background: #dbeafe; color: #1d4ed8; }
+    .method-get { background: #dcfce7; color: #15803d; }
+
+    .endpoint-url {
+      font-family: monospace;
+      font-size: 12px;
+      color: #0ea5e9;
+      flex: 1;
+    }
+
+    .endpoint-desc {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { padding: 32px 40px; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-area">
+      <h1>🧬 HexaGene</h1>
+      <div class="tagline">AI-Powered Health Intelligence Platform</div>
+    </div>
+    <div class="meta">
+      <strong>Project Status Report</strong><br>
+      April 24, 2026<br>
+      Version 1.0 — Production<br><br>
+      <span class="badge badge-live">● Live</span>
+    </div>
+  </div>
+
+  <!-- SUMMARY BOXES -->
+  <div class="summary-grid">
+    <div class="summary-box">
+      <div class="label">Deployment Status</div>
+      <div class="value">Live</div>
+      <div class="sub">Frontend + Backend in production</div>
+    </div>
+    <div class="summary-box">
+      <div class="label">API Endpoints</div>
+      <div class="value">6</div>
+      <div class="sub">Auth, Analysis, Key Management</div>
+    </div>
+    <div class="summary-box">
+      <div class="label">Analysis Engine</div>
+      <div class="value">S21</div>
+      <div class="sub">6-axis physics-based scoring</div>
+    </div>
+  </div>
+
+  <!-- DEPLOYMENT -->
+  <div class="section">
+    <div class="section-title">Deployment Infrastructure</div>
+    <table>
+      <tr>
+        <th>Layer</th>
+        <th>Technology</th>
+        <th>Status</th>
+        <th>URL</th>
+      </tr>
+      <tr>
+        <td><strong>Frontend</strong></td>
+        <td>React + Vite → Vercel</td>
+        <td><span class="badge badge-live">Live</span></td>
+        <td style="font-family:monospace; font-size:11px; color:#0ea5e9">hexagene-app.vercel.app</td>
+      </tr>
+      <tr>
+        <td><strong>Backend API</strong></td>
+        <td>FastAPI + Uvicorn → Render</td>
+        <td><span class="badge badge-live">Live</span></td>
+        <td style="font-family:monospace; font-size:11px; color:#0ea5e9">hexagene-app.onrender.com</td>
+      </tr>
+      <tr>
+        <td><strong>Database</strong></td>
+        <td>Supabase (PostgreSQL)</td>
+        <td><span class="badge badge-live">Live</span></td>
+        <td style="font-family:monospace; font-size:11px; color:#0ea5e9">Supabase Cloud</td>
+      </tr>
+      <tr>
+        <td><strong>Repository</strong></td>
+        <td>GitHub</td>
+        <td><span class="badge badge-live">Active</span></td>
+        <td style="font-family:monospace; font-size:11px; color:#0ea5e9">github.com/jafrundotpy/Hexagene-app</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- FEATURES BUILT -->
+  <div class="section">
+    <div class="section-title">Features Completed</div>
+    <div class="feature-list">
+      <div class="feature-item">
+        <div class="feature-icon">🔐</div>
+        <div class="feature-text">
+          <div class="title">Authentication System</div>
+          <div class="desc">Secure user signup/login with JWT tokens and bcrypt password hashing</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🔑</div>
+        <div class="feature-text">
+          <div class="title">API Key Management</div>
+          <div class="desc">Auto-generated <code>hx_</code> keys per user, stored in Supabase with usage tracking</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🧬</div>
+        <div class="feature-text">
+          <div class="title">S21 Analysis Engine</div>
+          <div class="desc">Physics-based 6-axis health scoring with weighted interaction model</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🌐</div>
+        <div class="feature-text">
+          <div class="title">External API Access</div>
+          <div class="desc">Clean REST API ready for PURA integration. Any client can call the engine via API key</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🛡️</div>
+        <div class="feature-text">
+          <div class="title">Rate Limiting</div>
+          <div class="desc">In-memory rate limiter — 100 requests/minute per API key. Returns HTTP 429 on breach</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📊</div>
+        <div class="feature-text">
+          <div class="title">Usage Logging</div>
+          <div class="desc">Every analysis call is logged to Supabase and usage_count is incremented per key</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S21 ENGINE -->
+  <div class="section">
+    <div class="section-title">S21 Analysis Engine — 6 Scoring Axes</div>
+    <div class="axes-grid">
+      <div class="axis-box">
+        <div class="axis-name">Inflammatory</div>
+        <div class="axis-icon">🔥</div>
+        <div style="font-size:11px; color:#64748b">CRP-based inflammation score</div>
+      </div>
+      <div class="axis-box">
+        <div class="axis-name">Metabolic</div>
+        <div class="axis-icon">⚡</div>
+        <div style="font-size:11px; color:#64748b">HbA1c metabolic efficiency</div>
+      </div>
+      <div class="axis-box">
+        <div class="axis-name">Structural</div>
+        <div class="axis-icon">🏗️</div>
+        <div style="font-size:11px; color:#64748b">Albumin structural integrity</div>
+      </div>
+      <div class="axis-box">
+        <div class="axis-name">Kinetic</div>
+        <div class="axis-icon">🫀</div>
+        <div style="font-size:11px; color:#64748b">eGFR organ function score</div>
+      </div>
+      <div class="axis-box">
+        <div class="axis-name">Redox</div>
+        <div class="axis-icon">🔬</div>
+        <div style="font-size:11px; color:#64748b">RDW cellular stress index</div>
+      </div>
+      <div class="axis-box">
+        <div class="axis-name">Balance</div>
+        <div class="axis-icon">⚖️</div>
+        <div style="font-size:11px; color:#64748b">Uric acid biochemical balance</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API ENDPOINTS -->
+  <div class="section">
+    <div class="section-title">Live API Endpoints</div>
+
+    <div class="endpoint-row">
+      <span class="method method-get">GET</span>
+      <span class="endpoint-url">hexagene-app.onrender.com/api/health</span>
+      <span class="endpoint-desc">Health check — returns {"status": "ok"}</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method method-post">POST</span>
+      <span class="endpoint-url">hexagene-app.onrender.com/api/analyze</span>
+      <span class="endpoint-desc">Core analysis engine — requires x-api-key header</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method method-post">POST</span>
+      <span class="endpoint-url">hexagene-app.onrender.com/api/generate-key</span>
+      <span class="endpoint-desc">Generate API key — requires JWT Bearer token</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method method-get">GET</span>
+      <span class="endpoint-url">hexagene-app.onrender.com/api/keys</span>
+      <span class="endpoint-desc">List all user API keys — requires JWT Bearer token</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method method-post">POST</span>
+      <span class="endpoint-url">hexagene-app.onrender.com/auth/signup</span>
+      <span class="endpoint-desc">Register new user account</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method method-post">POST</span>
+      <span class="endpoint-url">hexagene-app.onrender.com/auth/login</span>
+      <span class="endpoint-desc">Authenticate and receive JWT + API key</span>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div style="font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.8px;">Interactive API Docs</div>
+      <div class="code-block">
+        <span class="url">https://hexagene-app.onrender.com/docs</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXAMPLE REQUEST -->
+  <div class="section">
+    <div class="section-title">Example API Request — Client Integration</div>
+    <div class="code-block">
+<span class="comment"># Example: Call HexaGene analysis engine from any client</span>
+curl -X POST <span class="url">"https://hexagene-app.onrender.com/api/analyze"</span> \
+  -H <span class="val">"x-api-key: hx_your_key_here"</span> \
+  -H <span class="val">"Content-Type: application/json"</span> \
+  -d <span class="val">'{
+    "patient_data": {
+      "crp": 1.6,
+      "hba1c": 5.8,
+      "albumin": 4.2,
+      "egfr": 90,
+      "rdw": 13.0,
+      "uric_acid": 5.0
+    }
+  }'</span>
+
+<span class="comment"># Response:</span>
+{
+  <span class="key">"success"</span>: <span class="val">true</span>,
+  <span class="key">"risk_score"</span>: <span class="val">67.5</span>,
+  <span class="key">"axes"</span>: {
+    <span class="key">"inflammatory"</span>: <span class="val">68.0</span>,  <span class="key">"metabolic"</span>: <span class="val">42.0</span>,
+    <span class="key">"structural"</span>: <span class="val">84.0</span>,  <span class="key">"kinetic"</span>: <span class="val">90.0</span>,
+    <span class="key">"redox"</span>: <span class="val">35.0</span>,      <span class="key">"balance"</span>: <span class="val">48.0</span>
+  },
+  <span class="key">"s21_state"</span>: <span class="val">"moderate"</span>,
+  <span class="key">"status"</span>: <span class="val">"Moderate"</span>
+}
+    </div>
+  </div>
+
+  <!-- PENDING -->
+  <div class="section">
+    <div class="section-title">Next Phase — Pending Items</div>
+    <table>
+      <tr>
+        <th>Feature</th>
+        <th>Description</th>
+        <th>Status</th>
+      </tr>
+      <tr>
+        <td><strong>Screenshot OCR</strong></td>
+        <td>Extract wearable data from Apple Health / Fitbit screenshots automatically</td>
+        <td><span class="badge badge-paused">Paused</span></td>
+      </tr>
+      <tr>
+        <td><strong>PURA Integration</strong></td>
+        <td>Connect HexaGene engine to PURA client system via API</td>
+        <td><span class="badge badge-pending">Pending</span></td>
+      </tr>
+      <tr>
+        <td><strong>Supabase Schema</strong></td>
+        <td>Add is_active, usage_count, monthly_limit columns to api_keys table</td>
+        <td><span class="badge badge-pending">Pending</span></td>
+      </tr>
+      <tr>
+        <td><strong>Key Revocation</strong></td>
+        <td>Allow users to deactivate/revoke API keys from dashboard</td>
+        <td><span class="badge badge-pending">Pending</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <strong>HexaGene</strong> — Confidential Project Status Report · April 24, 2026
+    </div>
+    <div>
+      Prepared for internal review · <strong>v1.0 Production</strong>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
