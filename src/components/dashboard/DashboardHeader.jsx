@@ -13,10 +13,10 @@ const DashboardHeader = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-heading font-bold text-gradient-blue italic">
-            HexaGene Clinical Oracle <span className="text-hexa-muted not-italic font-medium text-xl">v7.9</span>
+            HexaGene S21 Intelligence Console <span className="text-hexa-muted not-italic font-medium text-xl">v2.0.0</span>
           </h1>
           <p className="text-hexa-muted text-sm mt-1 uppercase tracking-widest font-medium">
-            Biological & Physical Deterministic Modeling
+            Deterministic Biological Intelligence Platform
           </p>
         </div>
         <div className="flex items-center gap-4">

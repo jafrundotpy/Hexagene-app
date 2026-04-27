@@ -67,9 +67,29 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 app = FastAPI(title="HexaGene API")
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+
+    response = await call_next(request)
+
+    latency = round((time.time() - start) * 1000, 2)
+
+    try:
+        supabase.table("usage_logs").insert({
+            "endpoint": request.url.path,
+            "method": request.method,
+            "status_code": response.status_code,
+            "latency_ms": latency
+        }).execute()
+    except Exception as e:
+        print("Log insert failed:", e)
+
+    return response
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://hexagene-app.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

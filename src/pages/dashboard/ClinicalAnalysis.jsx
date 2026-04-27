@@ -1,172 +1,203 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  Cpu,
+  Shield,
+  Activity,
+  Zap,
+  Database,
+  Gauge,
+  Orbit,
+  Sparkles,
+} from "lucide-react";
 import DashboardHeader from "../../components/dashboard/DashboardHeader";
-import ControlBar from "../../components/dashboard/ControlBar";
-import InputPanel from "../../components/dashboard/InputPanel";
-import PredictionCards from "../../components/dashboard/PredictionCards";
-import ValidationPanel from "../../components/dashboard/ValidationPanel";
 
 const ClinicalAnalysis = () => {
-  // --- STATE ---
-  const [isManualMode, setIsManualMode] = useState(false);
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [revealId, setRevealId] = useState("HG-" + Math.floor(100000 + Math.random() * 900000));
-  const [timeRange, setTimeRange] = useState("1 Year");
-  
-  const [filters, setFilters] = useState({
-    ageGroup: "All",
-    gender: "All",
-    riskLevel: "All"
-  });
-
-  const [formValues, setFormValues] = useState({
-    age: "", sex: "", systolic: "", diastolic: "",
-    hba1c: "", glucose: "", triglycerides: "",
-    ldl: "", crp: "", wbc: "",
-    insulin: "", ggt: "", hdl: "", uricAcid: "",
-    hrv: "", sleep: "", steps: ""
-  });
-
-  const [predictions, setPredictions] = useState({
-    liver: "OK", immune: "OK", lowT: "OK",
-    fibrosis: "OK", vascular: "OK", kidney: "OK"
-  });
-
-  const [validationData, setValidationData] = useState([]);
-
-  // --- LOGIC ---
-  const generateRandomValues = () => {
-    const randoms = {
-      age: Math.floor(Math.random() * (80 - 18) + 18).toString(),
-      sex: Math.random() > 0.5 ? "Male" : "Female",
-      systolic: Math.floor(Math.random() * (160 - 110) + 110).toString(),
-      diastolic: Math.floor(Math.random() * (100 - 70) + 70).toString(),
-      hba1c: (Math.random() * (7.5 - 4.5) + 4.5).toFixed(1),
-      glucose: Math.floor(Math.random() * (120 - 80) + 80).toString(),
-      triglycerides: Math.floor(Math.random() * (250 - 50) + 50).toString(),
-      ldl: Math.floor(Math.random() * (180 - 80) + 80).toString(),
-      crp: (Math.random() * (5.0 - 0.1) + 0.1).toFixed(1),
-      wbc: (Math.random() * (11.0 - 4.0) + 4.0).toFixed(1),
-      insulin: (Math.random() * (25 - 2) + 2).toFixed(1),
-      ggt: Math.floor(Math.random() * (60 - 5) + 5).toString(),
-      hdl: Math.floor(Math.random() * (80 - 30) + 30).toString(),
-      uricAcid: (Math.random() * (8.0 - 3.0) + 3.0).toFixed(1),
-      hrv: Math.floor(Math.random() * (100 - 20) + 20).toString(),
-      sleep: (Math.random() * (9 - 4) + 4).toFixed(1),
-      steps: Math.floor(Math.random() * (15000 - 2000) + 2000).toLocaleString()
-    };
-    setFormValues(randoms);
-    calculatePredictions(randoms);
-    setRevealId("HG-" + Math.floor(100000 + Math.random() * 900000));
-    setIsRevealed(false);
-  };
-
-  const calculatePredictions = (vals) => {
-    // Simple mock logic
-    const newPreds = {
-      liver: parseFloat(vals.ggt) > 50 || parseFloat(vals.triglycerides) > 200 ? "Risk" : (parseFloat(vals.ggt) > 35 ? "Watch" : "OK"),
-      immune: parseFloat(vals.crp) > 3.0 ? "Risk" : (parseFloat(vals.crp) > 1.5 ? "Watch" : "OK"),
-      lowT: vals.sex === "Male" && parseFloat(vals.age) > 40 ? "Watch" : "OK",
-      fibrosis: parseFloat(vals.hba1c) > 6.5 ? "Risk" : (parseFloat(vals.hba1c) > 5.7 ? "Watch" : "OK"),
-      vascular: parseFloat(vals.systolic) > 140 ? "Risk" : (parseFloat(vals.systolic) > 130 ? "Watch" : "OK"),
-      kidney: parseFloat(vals.glucose) > 110 ? "Watch" : "OK"
-    };
-    setPredictions(newPreds);
-
-    // Mock Validation Data
-    setValidationData([
-      { name: "Liver Fat Index", value: (Math.random() * 30).toFixed(1) + "%", status: newPreds.liver === "Risk" ? "Occult" : "Match" },
-      { name: "NLR (Neutrophil/Lymphocyte)", value: (Math.random() * 4).toFixed(2), status: newPreds.immune === "OK" ? "Match" : "Watch" },
-      { name: "Free Testosterone", value: (Math.random() * 20 + 5).toFixed(1) + " pg/mL", status: newPreds.lowT === "OK" ? "Match" : "Watch" },
-      { name: "Arterial Stiffness", value: (Math.random() * 10 + 5).toFixed(1) + " m/s", status: newPreds.vascular === "OK" ? "Match" : "Occult" },
-      { name: "Pulse Pressure", value: (parseInt(vals.systolic) - parseInt(vals.diastolic)) + " mmHg", status: "Match" },
-      { name: "Urine Albumin", value: (Math.random() * 30).toFixed(1) + " mg/g", status: "Match" }
-    ]);
-  };
-
-  const handleInputChange = (name, value) => {
-    const newValues = { ...formValues, [name]: value };
-    setFormValues(newValues);
-    if (isManualMode) {
-       calculatePredictions(newValues);
-    }
-  };
-
-  const toggleMode = () => {
-    if (!isManualMode) {
-      // Switch to manual - clear data
-      setFormValues({
-        age: "", sex: "", systolic: "", diastolic: "",
-        hba1c: "", glucose: "", triglycerides: "",
-        ldl: "", crp: "", wbc: "",
-        insulin: "", ggt: "", hdl: "", uricAcid: "",
-        hrv: "", sleep: "", steps: ""
-      });
-      setPredictions({ liver: "OK", immune: "OK", lowT: "OK", fibrosis: "OK", vascular: "OK", kidney: "OK" });
-      setIsRevealed(false);
-    } else {
-      generateRandomValues();
-    }
-    setIsManualMode(!isManualMode);
-  };
+  const [loaded, setLoaded] = useState(false);
+  const [pulse, setPulse] = useState(0);
 
   useEffect(() => {
-    generateRandomValues();
+    setLoaded(true);
+
+    const timer = setInterval(() => {
+      setPulse((prev) => (prev >= 100 ? 0 : prev + 1));
+    }, 45);
+
+    return () => clearInterval(timer);
   }, []);
 
+  const features = [
+    {
+      icon: <Cpu size={20} />,
+      title: "HexaGene S21 Core",
+      desc: "Deterministic biological computation engine built for structured clinical risk modeling.",
+    },
+    {
+      icon: <Activity size={20} />,
+      title: "6-Axis Analysis",
+      desc: "Structural, inflammatory, metabolic, redox, kinetic, and balance system stress scoring.",
+    },
+    {
+      icon: <Shield size={20} />,
+      title: "Clinical Confidence",
+      desc: "Transparent scoring outputs with explainable logic instead of black-box predictions.",
+    },
+    {
+      icon: <Database size={20} />,
+      title: "API Ready",
+      desc: "Deploy through secure REST architecture with key auth, quotas, logs, and metrics.",
+    },
+    {
+      icon: <Gauge size={20} />,
+      title: "Low Latency",
+      desc: "Fast compute pipeline optimized for real-time SaaS and enterprise integrations.",
+    },
+    {
+      icon: <Zap size={20} />,
+      title: "Scalable Infrastructure",
+      desc: "Designed for healthcare platforms, labs, wellness apps, and enterprise systems.",
+    },
+  ];
+
+  const metrics = [
+    { label: "Engine Version", value: "v2.0.0" },
+    { label: "Model Core", value: "S21" },
+    { label: "Avg Compute", value: "1.8ms" },
+    { label: "API Ready", value: "100%" },
+  ];
+
+  const axes = [
+    { name: "Structural", val: 92 },
+    { name: "Inflammatory", val: 84 },
+    { name: "Metabolic", val: 88 },
+    { name: "Redox", val: 81 },
+    { name: "Kinetic", val: 79 },
+    { name: "Balance", val: 85 },
+  ];
+
   return (
-    <div className="min-h-screen bg-transparent p-4 lg:p-8 flex flex-col max-w-[1600px] mx-auto animate-fade-in relative z-10">
-      {/* Background Glows */}
-      <div className="bg-orb orb-1 top-0 left-0 w-[500px] h-[500px] bg-hexa-primary/20"></div>
-      <div className="bg-orb orb-2 bottom-0 right-0 w-[600px] h-[600px] bg-hexa-secondary/20"></div>
+    <div className="min-h-screen bg-transparent p-4 lg:p-8 max-w-[1600px] mx-auto text-white relative overflow-hidden">
+      {/* Glow Background */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-cyan-500/10 blur-[130px] rounded-full"></div>
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/10 blur-[130px] rounded-full"></div>
 
       <DashboardHeader />
 
-      <ControlBar 
-        onLoadRandom={generateRandomValues}
-        onReveal={() => setIsRevealed(true)}
-        onToggleMode={toggleMode}
-        isManualMode={isManualMode}
-        filters={filters}
-        onFilterChange={(k, v) => setFilters(prev => ({ ...prev, [k]: v }))}
-        revealId={revealId}
-      />
+      {/* HERO */}
+      <section
+        className={`mt-8 transition-all duration-1000 ${
+          loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+        }`}
+      >
+        <div className="border border-white/10 rounded-3xl p-8 bg-white/[0.03] backdrop-blur-xl">
+          <div className="flex items-center gap-3 text-cyan-400 text-sm font-semibold tracking-widest uppercase">
+            <Sparkles size={16} />
+            Clinical Intelligence Layer
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left: Input Form */}
-        <aside className="lg:col-span-4 h-[calc(100vh-320px)] min-h-[600px]">
-          <InputPanel 
-            values={formValues} 
-            onChange={handleInputChange} 
-            onUpload={generateRandomValues} 
-          />
-        </aside>
+          <h1 className="text-5xl lg:text-6xl font-bold mt-5 leading-tight">
+            HexaGene S21
+            <span className="block text-cyan-400">Biological Engine</span>
+          </h1>
 
-        {/* Right Content */}
-        <main className="lg:col-span-8 flex flex-col gap-8">
-          <PredictionCards 
-            predictions={predictions} 
-            timeRange={timeRange}
-            onTimeRangeChange={setTimeRange}
-          />
+          <p className="text-slate-300 mt-5 text-lg max-w-3xl leading-8">
+            Premium deterministic biological intelligence system built to score
+            structured health data, quantify risk, and power enterprise-grade
+            clinical products.
+          </p>
 
-          <ValidationPanel 
-            isRevealed={isRevealed}
-            validationData={validationData}
-          />
-        </main>
-      </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+            {metrics.map((item, i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-white/10 bg-black/20 p-5"
+              >
+                <p className="text-slate-400 text-sm">{item.label}</p>
+                <h3 className="text-2xl font-bold mt-2">{item.value}</h3>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      {/* Footer Meta */}
-      <footer className="mt-auto pt-8 flex justify-between items-center text-[10px] text-hexa-muted font-bold uppercase tracking-widest">
-         <div className="flex gap-6">
-            <span>© 2026 HEXAGENE AI</span>
-            <span>GDPR COMPLIANT</span>
-            <span>AES-256 ENCRYPTED</span>
-         </div>
-         <div className="flex gap-4 items-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-hexa-success"></div>
-            SYSTEM STABLE: 12ms LATENCY
-         </div>
+      {/* LIVE CORE */}
+      <section className="grid lg:grid-cols-2 gap-8 mt-8">
+        {/* Pulse Engine */}
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
+          <div className="flex items-center gap-3 mb-6">
+            <Orbit className="text-cyan-400" size={20} />
+            <h2 className="text-2xl font-bold">Live Engine Core</h2>
+          </div>
+
+          <div className="relative flex items-center justify-center h-[320px]">
+            <div className="absolute w-56 h-56 border border-cyan-400/20 rounded-full animate-spin"></div>
+            <div className="absolute w-72 h-72 border border-cyan-400/10 rounded-full animate-pulse"></div>
+
+            <div className="w-36 h-36 rounded-full bg-cyan-400/10 border border-cyan-400 flex items-center justify-center text-center">
+              <div>
+                <p className="text-xs text-slate-400">ENGINE LOAD</p>
+                <h3 className="text-3xl font-bold">{pulse}%</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Axis */}
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
+          <div className="flex items-center gap-3 mb-6">
+            <Activity className="text-cyan-400" size={20} />
+            <h2 className="text-2xl font-bold">6 Axis Intelligence</h2>
+          </div>
+
+          <div className="space-y-5">
+            {axes.map((item, i) => (
+              <div key={i}>
+                <div className="flex justify-between text-sm mb-2">
+                  <span>{item.name}</span>
+                  <span>{item.val}%</span>
+                </div>
+
+                <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-700"
+                    style={{ width: `${item.val}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="mt-8">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
+          <h2 className="text-3xl font-bold mb-8">What Users Get</h2>
+
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {features.map((item, i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-white/10 bg-black/20 p-6 hover:border-cyan-400/40 transition-all duration-300"
+              >
+                <div className="w-11 h-11 rounded-xl bg-cyan-400/10 text-cyan-400 flex items-center justify-center mb-4">
+                  {item.icon}
+                </div>
+
+                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
+                <p className="text-slate-400 leading-7 text-sm">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="mt-10 border border-white/10 rounded-3xl bg-white/[0.03] p-6 flex flex-col lg:flex-row justify-between gap-4 text-sm text-slate-400">
+        <div>© 2026 HexaGene • Premium Biological Intelligence Platform</div>
+        <div className="flex items-center gap-2 text-cyan-400">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+          Engine Stable • Enterprise Ready
+        </div>
       </footer>
     </div>
   );
