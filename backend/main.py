@@ -416,7 +416,6 @@ async def v2_score(request: AnalysisRequest, key_data=Depends(verify_api_key)):
     """
 
     start = time.time()
-
     data = request.patient_data
 
     if not data:
@@ -432,17 +431,9 @@ async def v2_score(request: AnalysisRequest, key_data=Depends(verify_api_key)):
         # Reuse existing engine
         result = run_analysis_logic(key_data, data)
 
-        # usage count
-        try:
-            supabase.table("api_keys").update({
-                "usage_count": key_data.get("usage_count", 0) + 1
-            }).eq("id", key_data["id"]).execute()
-        except Exception:
-            pass
-
         compute_time = round((time.time() - start) * 1000, 2)
 
-        return {
+        response_data = {
             "version": "2.0.0",
             "engine": "HexaGene S21",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -485,10 +476,22 @@ async def v2_score(request: AnalysisRequest, key_data=Depends(verify_api_key)):
             "forces": None
         }
 
+        # Update usage count (IMPORTANT FIX)
+        try:
+            current_count = key_data.get("usage_count", 0) or 0
+
+            supabase.table("api_keys").update({
+                "usage_count": current_count + 1
+            }).eq("id", key_data["id"]).execute()
+
+        except Exception as usage_error:
+            print("Usage count update failed:", usage_error)
+
+        return response_data
+
     except Exception as e:
         logger.error(f"/v2/score error: {str(e)}")
         raise HTTPException(status_code=500, detail="Scoring failed")
-
 
 def run_analysis_logic(key_data, data):
     # -----------------------------
