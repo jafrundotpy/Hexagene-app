@@ -1,4 +1,4 @@
-"""
+﻿"""
 HexaGene API — Production Backend
 ==================================
 
@@ -216,29 +216,34 @@ async def login(user: UserLogin):
 # -----------------------------
 
 @app.post("/api/generate-key")
-async def generate_key(current_user=Depends(get_current_user)):
-    """
-    Generate API key (1 per user).
-    Stores hashed version in DB.
-    Returns raw key ONLY once.
-    """
+async def generate_api_key_route(current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user["id"]
 
-        # 🔍 Check if user already has active key
-        existing = supabase.table("api_keys") \
-            .select("*") \
-            .eq("user_id", user_id) \
-            .eq("is_active", True) \
-            .execute()
+        # Delete old keys first
+        supabase.table("api_keys").delete().eq("user_id", user_id).execute()
 
-        if existing.data:
-            return {
-                "success": True,
-                "api_key": "Already generated",
-                "message": "User already has active API key"
-            }
+        # Generate raw key
+        raw_key = generate_api_key()        # hx_xxxxx
+        hashed_key = hash_api_key(raw_key) # save only hash
 
+        # Insert hash into DB
+        supabase.table("api_keys").insert({
+            "user_id": user_id,
+            "api_key": hashed_key,
+            "is_active": True
+        }).execute()
+
+        # Return raw key ONLY ONCE
+        return {
+            "success": True,
+            "api_key": raw_key,
+            "message": "Save this now. It won't be shown again."
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
         # 🔐 Generate new key
         raw_key = generate_api_key()
         hashed_key = hash_api_key(raw_key)
