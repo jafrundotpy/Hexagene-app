@@ -11,6 +11,7 @@ import ClinicalAnalysis from './pages/dashboard/ClinicalAnalysis';
 import Simulations from './pages/dashboard/Simulations';
 import ApiAccess from './pages/dashboard/ApiAccess';
 import IntegrationDocs from './pages/dashboard/IntegrationDocs';
+import Usage from './pages/dashboard/Usage';
 
 // 🔐 PROTECTED ROUTE (TOKEN BASED)
 const ProtectedRoute = ({ children }) => {
@@ -88,7 +89,7 @@ function App() {
 
           {/* Extra */}
           <Route path="simulations" element={<Simulations />} />
-          <Route path="usage" element={<PlaceholderPage title="Usage Metrics" />} />
+          <Route path="usage" element={<Usage />} />
           <Route path="settings" element={<PlaceholderPage title="Settings" />} />
         </Route>
 
