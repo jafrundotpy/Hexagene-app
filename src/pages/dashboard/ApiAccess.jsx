@@ -78,7 +78,6 @@ const ApiAccess = () => {
         setTimeout(() => {
           fetchKeys();
         }, 10000)
-        await fetchKeys();
       } else {
         setGenerateError(data.detail || "Failed to generate key");
       }
@@ -343,9 +342,7 @@ const ApiAccess = () => {
                           color: "#4fc3f7"
                         }}
                       >
-                        {showKeyId === k.id
-                          ? k.api_key
-                          : maskKey(k.api_key)}
+                        Stored Securely  
                       </span>
 
                       <div style={{ display: "flex", gap: "8px" }}>
