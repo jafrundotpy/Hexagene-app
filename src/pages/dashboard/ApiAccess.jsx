@@ -74,7 +74,10 @@ const ApiAccess = () => {
         // SHOW RAW KEY (hx_)
         setGeneratedKey(data.api_key);
 
-        // refresh list (hashed in DB)
+        // refresh after delay so user can see raw key first
+        setTimeout(() => {
+          fetchKeys();
+        }, 10000)
         await fetchKeys();
       } else {
         setGenerateError(data.detail || "Failed to generate key");
