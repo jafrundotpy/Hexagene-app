@@ -482,7 +482,7 @@ async def v2_score(request: AnalysisRequest, key_data=Depends(verify_api_key)):
 
             supabase.table("api_keys").update({
                 "usage_count": current_count + 1
-            }).eq("id", key_data["id"]).execute()
+            }).eq("user_id", key_data["user_id"]).execute()
 
         except Exception as usage_error:
             print("Usage count update failed:", usage_error)
