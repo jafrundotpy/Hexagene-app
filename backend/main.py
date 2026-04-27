@@ -85,25 +85,61 @@ security = HTTPBearer(auto_error=False)
 
 # -----------------------------
 # RATE LIMITER (in-memory)
-# Max 100 req/min per API key
+# 60 req/min + burst protection
 # -----------------------------
 _rate_limit_store: dict = defaultdict(list)
-RATE_LIMIT = 100
+
+RATE_LIMIT = 60
 RATE_WINDOW = 60  # seconds
+
+BURST_LIMIT = 10
+BURST_WINDOW = 5  # seconds
+
 
 def check_rate_limit(api_key: str):
     now = time.time()
+
+    # -----------------------------
+    # Minute Window Protection
+    # -----------------------------
     window_start = now - RATE_WINDOW
-    # Prune old timestamps
-    _rate_limit_store[api_key] = [t for t in _rate_limit_store[api_key] if t > window_start]
+
+    _rate_limit_store[api_key] = [
+        t for t in _rate_limit_store[api_key]
+        if t > window_start
+    ]
+
     if len(_rate_limit_store[api_key]) >= RATE_LIMIT:
         raise HTTPException(
             status_code=429,
-            detail={"success": False, "message": "Rate limit exceeded. Max 100 requests per minute."}
+            detail={
+                "success": False,
+                "message": "Rate limit exceeded. Please retry in 60 seconds."
+            }
         )
-    _rate_limit_store[api_key].append(now)
 
-# -----------------------------
+    # -----------------------------
+    # Burst Protection
+    # Max 10 requests in 5 sec
+    # -----------------------------
+    recent_burst = [
+        t for t in _rate_limit_store[api_key]
+        if t > now - BURST_WINDOW
+    ]
+
+    if len(recent_burst) >= BURST_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "success": False,
+                "message": "Too many rapid requests. Please slow down."
+            }
+        )
+
+    # -----------------------------
+    # Save Current Request Time
+    # -----------------------------
+    _rate_limit_store[api_key].append(now)# -----------------------------
 # MODELS
 # -----------------------------
 class UserSignup(BaseModel):
