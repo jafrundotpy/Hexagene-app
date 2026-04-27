@@ -10,6 +10,7 @@ import AuthPage from './pages/AuthPage';
 import ClinicalAnalysis from './pages/dashboard/ClinicalAnalysis';
 import Simulations from './pages/dashboard/Simulations';
 import ApiAccess from './pages/dashboard/ApiAccess';
+import IntegrationDocs from './pages/dashboard/IntegrationDocs';
 
 // 🔐 PROTECTED ROUTE (TOKEN BASED)
 const ProtectedRoute = ({ children }) => {
@@ -83,6 +84,7 @@ function App() {
           {/* Main Pages */}
           <Route path="analysis" element={<ClinicalAnalysis />} />
           <Route path="api" element={<ApiAccess />} />
+          <Route path="docs" element={<IntegrationDocs />} />
 
           {/* Extra */}
           <Route path="simulations" element={<Simulations />} />
