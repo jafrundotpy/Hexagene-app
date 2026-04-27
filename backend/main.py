@@ -92,8 +92,8 @@ _rate_limit_store: dict = defaultdict(list)
 RATE_LIMIT = 60
 RATE_WINDOW = 60  # seconds
 
-BURST_LIMIT = 3
-BURST_WINDOW = 5  # seconds
+BURST_LIMIT = 2
+BURST_WINDOW = 10  # seconds
 
 
 def check_rate_limit(api_key: str):

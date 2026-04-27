@@ -27,7 +27,7 @@ const LandingPage = () => {
       <section className="hero-section animate-fade-in">
         <div className="status-badge">
           <span className="pulse-dot"></span>
-          Engine Online ver 2.4.1
+          Hexagene S21 Engine Online v2.0.0
         </div>
         <h1 className="hero-title text-gradient">
           Biology is Structural Physics
