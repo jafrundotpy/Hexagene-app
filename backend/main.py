@@ -152,13 +152,24 @@ async def verify_api_key(x_api_key: str = Header(None)):
             detail={"success": False, "message": "Missing API key"}
         )
 
-    # Hash the incoming key — DB stores only SHA256 hashes
+    # Hash incoming raw key (DB stores only hash)
     hashed_incoming = hash_api_key(x_api_key)
 
     try:
-        res = supabase.table("api_keys").select("*").eq("api_key", hashed_incoming).eq("is_active", True).execute()
+        res = (
+            supabase.table("api_keys")
+            .select("*")
+            .eq("api_key", hashed_incoming)
+            .eq("is_active", True)
+            .execute()
+        )
     except Exception:
-        res = supabase.table("api_keys").select("*").eq("api_key", hashed_incoming).execute()
+        res = (
+            supabase.table("api_keys")
+            .select("*")
+            .eq("api_key", hashed_incoming)
+            .execute()
+        )
 
     if not res.data:
         raise HTTPException(
@@ -167,9 +178,24 @@ async def verify_api_key(x_api_key: str = Header(None)):
         )
 
     key_data = res.data[0]
+
+    # Monthly quota check
+    usage_count = key_data.get("usage_count", 0) or 0
+    monthly_limit = key_data.get("monthly_limit", 10000) or 10000
+
+    if usage_count >= monthly_limit:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "success": False,
+                "message": "Monthly API quota exceeded. Please upgrade plan."
+            }
+        )
+
     logger.info(f"API key verified for user_id={key_data['user_id']}")
 
     check_rate_limit(hashed_incoming)
+
     return key_data
 
 # -----------------------------
