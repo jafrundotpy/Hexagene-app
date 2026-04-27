@@ -92,7 +92,7 @@ _rate_limit_store: dict = defaultdict(list)
 RATE_LIMIT = 60
 RATE_WINDOW = 60  # seconds
 
-BURST_LIMIT = 10
+BURST_LIMIT = 3
 BURST_WINDOW = 5  # seconds
 
 
