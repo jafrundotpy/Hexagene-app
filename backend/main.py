@@ -306,8 +306,33 @@ async def get_user_keys(current_user=Depends(get_current_user)):
 def health_check():
     return {"status": "ok"}
 
+
 # -----------------------------
-# ANALYZE (ADVANCED ENGINE)
+# HEXAGENE V2 HEALTH
+# -----------------------------
+@app.get("/v2/health")
+def v2_health():
+    return {
+        "status": "ok",
+        "version": "2.0.0"
+    }
+
+
+# -----------------------------
+# HEXAGENE V2 VERSION
+# -----------------------------
+@app.get("/v2/version")
+def v2_version():
+    return {
+        "version": "2.0.0",
+        "engine": "HexaGene S21",
+        "ready": True,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+# -----------------------------
+# ANALYZE (CURRENT ENGINE)
 # -----------------------------
 @app.post("/api/analyze")
 async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
@@ -316,17 +341,19 @@ async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
     data = request.patient_data
     print("Extracted patient_data:", data)
 
-    # Only reject if the request body is completely empty
     if not data:
         raise HTTPException(
             status_code=400,
-            detail={"success": False, "message": "Request body is empty. patient_data is required."}
+            detail={
+                "success": False,
+                "message": "Request body is empty. patient_data is required."
+            }
         )
 
     try:
         result = run_analysis_logic(key_data, data)
 
-        # Increment usage count (non-blocking)
+        # Increment usage count
         try:
             supabase.table("api_keys").update({
                 "usage_count": key_data.get("usage_count", 0) + 1
@@ -335,11 +362,101 @@ async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
             print("Usage increment error:", usage_err)
 
         return result
+
     except HTTPException:
         raise
+
     except Exception as e:
         logger.error(f"Analyze error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# -----------------------------
+# HEXAGENE V2 SCORE
+# -----------------------------
+@app.post("/v2/score")
+async def v2_score(request: AnalysisRequest, key_data=Depends(verify_api_key)):
+    """
+    New production-aligned route based on backend overview file
+    Uses same secure API key system
+    Header:
+    x-api-key: hx_xxxxx
+    """
+
+    start = time.time()
+
+    data = request.patient_data
+
+    if not data:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "message": "patient_data is required"
+            }
+        )
+
+    try:
+        # Reuse existing engine
+        result = run_analysis_logic(key_data, data)
+
+        # usage count
+        try:
+            supabase.table("api_keys").update({
+                "usage_count": key_data.get("usage_count", 0) + 1
+            }).eq("id", key_data["id"]).execute()
+        except Exception:
+            pass
+
+        compute_time = round((time.time() - start) * 1000, 2)
+
+        return {
+            "version": "2.0.0",
+            "engine": "HexaGene S21",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "compute_time_ms": compute_time,
+
+            "position": {
+                "axes": {
+                    "structural": round(result["axes"]["structural"] / 100, 3),
+                    "inflammatory": round(result["axes"]["inflammatory"] / 100, 3),
+                    "metabolic": round(result["axes"]["metabolic"] / 100, 3),
+                    "redox": round(result["axes"]["redox"] / 100, 3),
+                    "kinetic": round(result["axes"]["kinetic"] / 100, 3),
+                    "balance": round(result["axes"]["balance"] / 100, 3)
+                },
+                "risk_score": round(result["risk_score"] / 100, 3),
+                "classification": (
+                    "HIGH"
+                    if result["risk_score"] >= 70 else
+                    "MODERATE"
+                    if result["risk_score"] >= 50 else
+                    "LOW"
+                ),
+                "stability": "slope",
+                "discrete_state": 63,
+                "discrete_binary": "111111",
+                "tier": 3,
+                "confidence": {
+                    "structural": "med",
+                    "inflammatory": "med",
+                    "metabolic": "med",
+                    "redox": "med",
+                    "kinetic": "med",
+                    "balance": "med"
+                },
+                "missing_markers": [],
+                "present_markers": list(data.keys())
+            },
+
+            "terrain": None,
+            "forces": None
+        }
+
+    except Exception as e:
+        logger.error(f"/v2/score error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Scoring failed")
+
 
 def run_analysis_logic(key_data, data):
     # -----------------------------
@@ -382,9 +499,6 @@ def run_analysis_logic(key_data, data):
     rdw = safe_float(data.get("rdw"), 13.0)
     uric_acid = safe_float(data.get("uric_acid") or data.get("uricAcid"), 5.0)
 
-    # -----------------------------
-    # BASE SCORES
-    # -----------------------------
     inflammatory = clamp(100 - (crp * 20))
     metabolic = clamp(100 - (hba1c * 10))
     structural = clamp(albumin * 20)
@@ -392,15 +506,11 @@ def run_analysis_logic(key_data, data):
     redox = clamp(100 - (rdw * 5))
     balance = clamp(100 - (uric_acid * 10))
 
-    # -----------------------------
-    # RELATIONSHIPS (CORE LOGIC)
-    # -----------------------------
     metabolic -= (inflammatory * 0.1)
     kinetic -= (inflammatory * 0.1)
     redox -= (inflammatory * 0.15)
     balance -= (metabolic * 0.05)
 
-    # Clamp again after interactions
     inflammatory = clamp(inflammatory)
     metabolic = clamp(metabolic)
     structural = clamp(structural)
@@ -408,9 +518,6 @@ def run_analysis_logic(key_data, data):
     redox = clamp(redox)
     balance = clamp(balance)
 
-    # -----------------------------
-    # WEIGHT SYSTEM
-    # -----------------------------
     weights = {
         "structural": 0.15,
         "inflammatory": 0.20,
@@ -439,11 +546,6 @@ def run_analysis_logic(key_data, data):
 
     s21_state = status.lower().replace(" ", "_")
 
-    logger.info(f"Computed risk_score={risk_score}, status={status}")
-
-    # -----------------------------
-    # STANDARDIZED RESPONSE
-    # -----------------------------
     return {
         "success": True,
         "risk_score": risk_score,
@@ -453,12 +555,13 @@ def run_analysis_logic(key_data, data):
             "redox": round(redox, 2),
             "kinetic": round(kinetic, 2),
             "balance": round(balance, 2),
-            "structural": round(structural, 2),
+            "structural": round(structural, 2)
         },
         "s21_state": s21_state,
         "status": status,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
 
 # -----------------------------
 # ROOT
@@ -466,6 +569,7 @@ def run_analysis_logic(key_data, data):
 @app.get("/")
 def root():
     return {"status": "HexaGene API Running"}
+
 
 # -----------------------------
 # RUN
