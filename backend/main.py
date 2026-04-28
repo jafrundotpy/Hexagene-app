@@ -652,8 +652,7 @@ async def v2_score(
             status_code=400,
             detail={
                 "success": False,
-                "message":
-                "patient_data is required"
+                "message": "patient_data is required"
             }
         )
 
@@ -670,58 +669,27 @@ async def v2_score(
         response_data = {
             "version": "2.0.0",
             "engine": "HexaGene S21",
-            "timestamp":
-                datetime.now(
-                    timezone.utc
-                ).isoformat(),
-            "compute_time_ms":
-                compute_time,
+            "timestamp": datetime.now(
+                timezone.utc
+            ).isoformat(),
+
+            "compute_time_ms": compute_time,
 
             "position": {
                 "axes": {
-                    "structural":
-                        round(
-                            result["axes"]["structural"] / 100,
-                            3
-                        ),
-                    "inflammatory":
-                        round(
-                            result["axes"]["inflammatory"] / 100,
-                            3
-                        ),
-                    "metabolic":
-                        round(
-                            result["axes"]["metabolic"] / 100,
-                            3
-                        ),
-                    "redox":
-                        round(
-                            result["axes"]["redox"] / 100,
-                            3
-                        ),
-                    "kinetic":
-                        round(
-                            result["axes"]["kinetic"] / 100,
-                            3
-                        ),
-                    "balance":
-                        round(
-                            result["axes"]["balance"] / 100,
-                            3
-                        )
+                    "structural": round(result["axes"]["structural"] / 100, 3),
+                    "inflammatory": round(result["axes"]["inflammatory"] / 100, 3),
+                    "metabolic": round(result["axes"]["metabolic"] / 100, 3),
+                    "redox": round(result["axes"]["redox"] / 100, 3),
+                    "kinetic": round(result["axes"]["kinetic"] / 100, 3),
+                    "balance": round(result["axes"]["balance"] / 100, 3)
                 },
 
-                "risk_score":
-                    round(
-                        risk_score / 100,
-                        3
-                    ),
+                "risk_score": round(risk_score / 100, 3),
 
                 "classification":
-                    "HIGH"
-                    if risk_score >= 70
-                    else "MODERATE"
-                    if risk_score >= 50
+                    "HIGH" if risk_score >= 70
+                    else "MODERATE" if risk_score >= 50
                     else "LOW",
 
                 "stability": "slope",
@@ -739,25 +707,33 @@ async def v2_score(
                 },
 
                 "missing_markers": [],
-                "present_markers":
-                    list(data.keys())
+                "present_markers": list(data.keys())
             },
 
             "terrain": None,
             "forces": None
         }
 
+        # Update usage count
         current_count = key_data.get(
             "usage_count", 0
         ) or 0
 
         supabase.table("api_keys").update({
-            "usage_count":
-                current_count + 1
+            "usage_count": current_count + 1
         }).eq(
             "user_id",
             key_data["user_id"]
         ).execute()
+
+        # Insert analytics log
+        supabase.table("usage_logs").insert({
+            "user_id": key_data["user_id"],
+            "endpoint": "/v2/score",
+            "method": "POST",
+            "status_code": 200,
+            "latency_ms": compute_time
+        }).execute()
 
         return response_data
 
@@ -766,11 +742,20 @@ async def v2_score(
             f"/v2/score error: {str(e)}"
         )
 
+        # Error log also saved
+        supabase.table("usage_logs").insert({
+            "user_id": key_data["user_id"],
+            "endpoint": "/v2/score",
+            "method": "POST",
+            "status_code": 500,
+            "latency_ms": 0
+        }).execute()
+
         raise HTTPException(
             status_code=500,
             detail="Scoring failed"
         )
-
+        
 # =====================================================
 # ENGINE LOGIC
 # =====================================================
