@@ -141,55 +141,57 @@ security = HTTPBearer(auto_error=False)
 
 # =====================================================
 # RATE LIMITER
-# backend doc aligned
-# 100 req/min per API key
-# 10 req / 5 sec burst
+# 100 req/min
+# 5 req / 2 sec burst
 # =====================================================
 
 _rate_limit_store: dict = defaultdict(list)
 
-RATE_LIMIT = 100
+RATE_LIMIT = 20 
 RATE_WINDOW = 60
 
-BURST_LIMIT = 10
-BURST_WINDOW = 5
+BURST_LIMIT = 3
+BURST_WINDOW = 2
+
 
 def check_rate_limit(api_key: str):
     now = time.time()
 
-    # keep last 60 sec
+    # Clean old records
     _rate_limit_store[api_key] = [
         t for t in _rate_limit_store[api_key]
         if t > now - RATE_WINDOW
     ]
 
-    # per minute
-    if len(_rate_limit_store[api_key]) >= RATE_LIMIT:
+    requests = _rate_limit_store[api_key]
+
+    # Minute limit
+    if len(requests) >= RATE_LIMIT:
         raise HTTPException(
             status_code=429,
             detail={
                 "success": False,
-                "message": "Rate limit exceeded. Retry later."
+                "message": "Rate limit exceeded. Retry in 60 sec."
             }
         )
 
-    # burst protection
-    recent = [
-        t for t in _rate_limit_store[api_key]
+    # Burst limit
+    burst_requests = [
+        t for t in requests
         if t > now - BURST_WINDOW
     ]
 
-    if len(recent) >= BURST_LIMIT:
+    if len(burst_requests) >= BURST_LIMIT:
         raise HTTPException(
             status_code=429,
             detail={
                 "success": False,
-                "message": "Too many rapid requests."
+                "message": "Too many rapid requests. Slow down."
             }
         )
 
-    _rate_limit_store[api_key].append(now)
-
+    requests.append(now)
+    
 # =====================================================
 # MODELS
 # =====================================================
