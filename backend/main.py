@@ -586,7 +586,7 @@ async def analyze(
             "usage_count":
                 current_count + 1
         }).eq(
-            "id",
+            "user_id",
             key_data["id"]
         ).execute()
 
@@ -723,7 +723,7 @@ async def v2_score(
             "usage_count":
                 current_count + 1
         }).eq(
-            "id",
+            "user_id",
             key_data["id"]
         ).execute()
 
