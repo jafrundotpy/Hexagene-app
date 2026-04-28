@@ -141,8 +141,8 @@ security = HTTPBearer(auto_error=False)
 
 # =====================================================
 # RATE LIMITER (Supabase Logs Based)
-# 20 req / 60 sec
-# 3 req / 2 sec burst
+# 20 req/min memory
+# 3 req /2 sec memory
 # =====================================================
 
 RATE_LIMIT = 20
