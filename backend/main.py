@@ -515,14 +515,12 @@ def v2_version():
 # =====================================================
 
 @app.get("/api/usage-metrics")
-async def usage_metrics(
-    current_user=Depends(get_current_user)
-):
+async def usage_metrics(current_user=Depends(get_current_user)):
     try:
         user_id = current_user["id"]
 
         # -----------------------------
-        # USER API KEYS
+        # API KEYS
         # -----------------------------
         keys = (
             supabase.table("api_keys")
@@ -532,12 +530,12 @@ async def usage_metrics(
         )
 
         total_requests = sum(
-            k.get("usage_count", 0)
+            int(k.get("usage_count") or 0)
             for k in (keys.data or [])
         )
 
         # -----------------------------
-        # USER LOGS ONLY
+        # USAGE LOGS
         # -----------------------------
         logs = (
             supabase.table("usage_logs")
@@ -548,53 +546,43 @@ async def usage_metrics(
 
         rows = logs.data or []
 
-        # -----------------------------
-        # AVG LATENCY
-        # -----------------------------
-        latencies = [
-            r.get("latency_ms", 0)
+        valid_status = [
+            r for r in rows
+            if r.get("status_code") is not None
+        ]
+
+        valid_latency = [
+            float(r.get("latency_ms"))
             for r in rows
             if r.get("latency_ms") is not None
         ]
 
-        avg_latency = round(
-            sum(latencies) / len(latencies), 2
-        ) if latencies else 0
+        success_count = sum(
+            1 for r in valid_status
+            if int(r["status_code"]) < 400
+        )
 
-        # -----------------------------
-        # SUCCESS RATE
-        # -----------------------------
-        success_count = len([
-            r for r in rows
-            if (r.get("status_code") or 500) < 400
-        ])
+        error_count = sum(
+            1 for r in valid_status
+            if int(r["status_code"]) >= 400
+        )
 
-        success_rate = round(
-            (success_count / len(rows)) * 100, 2
-        ) if rows else 100
+        success_rate = (
+            round((success_count / len(valid_status)) * 100, 1)
+            if valid_status else 0
+        )
 
-        # -----------------------------
-        # ERRORS TODAY
-        # -----------------------------
-        today = datetime.now(timezone.utc).date()
+        avg_latency = (
+            round(sum(valid_latency) / len(valid_latency), 2)
+            if valid_latency else 0
+        )
 
-        errors_today = len([
-            r for r in rows
-            if (
-                (r.get("status_code") or 500) >= 400 and
-                str(r.get("created_at", "")).startswith(str(today))
-            )
-        ])
-
-        # -----------------------------
-        # RESPONSE
-        # -----------------------------
         return {
             "success": True,
             "total_requests": total_requests,
             "avg_compute_time": f"{avg_latency} ms",
             "success_rate": f"{success_rate}%",
-            "errors_today": errors_today,
+            "errors_today": error_count,
             "blood_requests": int(total_requests * 0.82),
             "med_requests": int(total_requests * 0.31),
             "variant_requests": int(total_requests * 0.12),
