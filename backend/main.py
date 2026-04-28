@@ -154,44 +154,61 @@ BURST_LIMIT = 3
 BURST_WINDOW = 2
 
 
-def check_rate_limit(api_key: str):
-    now = time.time()
+def check_rate_limit(user_id: str):
+    from datetime import datetime, timedelta, timezone
 
-    # Clean old records
-    _rate_limit_store[api_key] = [
-        t for t in _rate_limit_store[api_key]
-        if t > now - RATE_WINDOW
-    ]
+    now = datetime.now(timezone.utc)
 
-    requests = _rate_limit_store[api_key]
+    minute_ago = (
+        now - timedelta(seconds=60)
+    ).isoformat()
 
-    # Minute limit
-    if len(requests) >= RATE_LIMIT:
+    burst_ago = (
+        now - timedelta(seconds=2)
+    ).isoformat()
+
+    # --------------------------
+    # 20 requests / 60 sec
+    # --------------------------
+    minute_check = (
+        supabase.table("usage_logs")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .gte("created_at", minute_ago)
+        .execute()
+    )
+
+    if minute_check.count >= 20:
         raise HTTPException(
             status_code=429,
             detail={
                 "success": False,
-                "message": "Rate limit exceeded. Retry in 60 sec."
+                "message":
+                "Rate limit exceeded. Retry later."
             }
         )
 
-    # Burst limit
-    burst_requests = [
-        t for t in requests
-        if t > now - BURST_WINDOW
-    ]
+    # --------------------------
+    # 3 requests / 2 sec burst
+    # --------------------------
+    burst_check = (
+        supabase.table("usage_logs")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .gte("created_at", burst_ago)
+        .execute()
+    )
 
-    if len(burst_requests) >= BURST_LIMIT:
+    if burst_check.count >= 3:
         raise HTTPException(
             status_code=429,
             detail={
                 "success": False,
-                "message": "Too many rapid requests. Slow down."
+                "message":
+                "Too many rapid requests."
             }
         )
-
-    requests.append(now)
-    
+            
 # =====================================================
 # MODELS
 # =====================================================
@@ -326,7 +343,7 @@ async def verify_api_key(
             }
         )
 
-    check_rate_limit(hashed_incoming)
+    check_rate_limit(key_data["user_id"])
 
     logger.info(
         f"API key verified user_id={key_data['user_id']}"
