@@ -140,14 +140,12 @@ app.add_middleware(
 security = HTTPBearer(auto_error=False)
 
 # =====================================================
-# RATE LIMITER
-# 100 req/min
-# 5 req / 2 sec burst
+# RATE LIMITER (Supabase Logs Based)
+# 20 req / 60 sec
+# 3 req / 2 sec burst
 # =====================================================
 
-_rate_limit_store: dict = defaultdict(list)
-
-RATE_LIMIT = 20 
+RATE_LIMIT = 20
 RATE_WINDOW = 60
 
 BURST_LIMIT = 3
@@ -160,54 +158,73 @@ def check_rate_limit(user_id: str):
     now = datetime.now(timezone.utc)
 
     minute_ago = (
-        now - timedelta(seconds=60)
+        now - timedelta(seconds=RATE_WINDOW)
     ).isoformat()
 
     burst_ago = (
-        now - timedelta(seconds=2)
+        now - timedelta(seconds=BURST_WINDOW)
     ).isoformat()
 
-    # --------------------------
-    # 20 requests / 60 sec
-    # --------------------------
-    minute_check = (
-        supabase.table("usage_logs")
-        .select("id", count="exact")
-        .eq("user_id", user_id)
-        .gte("created_at", minute_ago)
-        .execute()
-    )
-
-    if minute_check.count >= 20:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "success": False,
-                "message":
-                "Rate limit exceeded. Retry later."
-            }
+    try:
+        # --------------------------
+        # 20 requests / 60 sec
+        # --------------------------
+        minute_check = (
+            supabase.table("usage_logs")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .gte("created_at", minute_ago)
+            .execute()
         )
 
-    # --------------------------
-    # 3 requests / 2 sec burst
-    # --------------------------
-    burst_check = (
-        supabase.table("usage_logs")
-        .select("id", count="exact")
-        .eq("user_id", user_id)
-        .gte("created_at", burst_ago)
-        .execute()
-    )
-
-    if burst_check.count >= 3:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "success": False,
-                "message":
-                "Too many rapid requests."
-            }
+        minute_count = (
+            minute_check.count or 0
         )
+
+        if minute_count >= RATE_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "success": False,
+                    "message":
+                    "Rate limit exceeded. Retry later."
+                }
+            )
+
+        # --------------------------
+        # 3 requests / 2 sec burst
+        # --------------------------
+        burst_check = (
+            supabase.table("usage_logs")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .gte("created_at", burst_ago)
+            .execute()
+        )
+
+        burst_count = (
+            burst_check.count or 0
+        )
+
+        if burst_count >= BURST_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "success": False,
+                    "message":
+                    "Too many rapid requests."
+                }
+            )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(
+            f"Rate limiter error: {str(e)}"
+        )
+        # fail open so API still works
+        return
             
 # =====================================================
 # MODELS
