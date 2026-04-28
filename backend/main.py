@@ -519,9 +519,7 @@ async def usage_metrics(current_user=Depends(get_current_user)):
     try:
         user_id = current_user["id"]
 
-        # -----------------------------
-        # API KEYS
-        # -----------------------------
+        # API Keys
         keys = (
             supabase.table("api_keys")
             .select("*")
@@ -534,9 +532,7 @@ async def usage_metrics(current_user=Depends(get_current_user)):
             for k in (keys.data or [])
         )
 
-        # -----------------------------
-        # USAGE LOGS
-        # -----------------------------
+        # Logs
         logs = (
             supabase.table("usage_logs")
             .select("*")
@@ -567,15 +563,13 @@ async def usage_metrics(current_user=Depends(get_current_user)):
             if int(r["status_code"]) >= 400
         )
 
-        success_rate = (
-            round((success_count / len(valid_status)) * 100, 1)
-            if valid_status else 0
-        )
+        success_rate = round(
+            (success_count / len(valid_status)) * 100, 1
+        ) if valid_status else 0
 
-        avg_latency = (
-            round(sum(valid_latency) / len(valid_latency), 2)
-            if valid_latency else 0
-        )
+        avg_latency = round(
+            sum(valid_latency) / len(valid_latency), 2
+        ) if valid_latency else 0
 
         return {
             "success": True,
@@ -590,10 +584,8 @@ async def usage_metrics(current_user=Depends(get_current_user)):
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
+
 # =====================================================
 # LEGACY ANALYZE
 # =====================================================
