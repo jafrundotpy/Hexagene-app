@@ -534,20 +534,17 @@ async def usage_metrics(
         )
 
         return {
-            "success": True,
-            "total_requests": total_requests,
-            "avg_compute_time": "1.8 ms",
-            "success_rate": "99.8%",
-            "errors_today": 0,
-            "blood_requests":
-                int(total_requests * 0.82),
-            "med_requests":
-                int(total_requests * 0.31),
-            "variant_requests":
-                int(total_requests * 0.12),
-            "avg_variant_count": 12
+           "success": True,
+           "total_requests": total_requests,
+           "avg_compute_time": "1.8 ms",
+           "success_rate": "99.8%",
+           "errors_today": 0,
+           "blood_requests": int(total_requests * 0.82),
+           "med_requests": int(total_requests * 0.31),
+           "variant_requests": int(total_requests * 0.12),
+           "avg_variant_count": 12
         }
-
+        
     except Exception as e:
         raise HTTPException(
             status_code=500,
