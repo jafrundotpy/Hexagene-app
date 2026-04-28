@@ -1,4 +1,4 @@
-﻿"""
+"""
 HexaGene API — Production Backend
 ==================================
 Updated first section (cleaned + safe)
@@ -28,6 +28,7 @@ import os
 import uuid
 import time
 import logging
+import threading
 from pathlib import Path
 from collections import defaultdict
 
@@ -77,9 +78,22 @@ async def safe_error_handler(
     request: Request,
     exc: Exception
 ):
-    error_id = str(uuid.uuid4())[:8]
+    # CRITICAL: Do NOT swallow HTTPException — pass it through correctly.
+    # Without this, HTTPException(429) would be caught here and returned
+    # as a 500, making rate limiting appear broken.
+    if isinstance(exc, HTTPException):
+        content = exc.detail if isinstance(exc.detail, dict) else {
+            "success": False,
+            "message": str(exc.detail)
+        }
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=content,
+            headers=getattr(exc, "headers", None) or {}
+        )
 
-    logger.error(f"[{error_id}] {str(exc)}")
+    error_id = str(uuid.uuid4())[:8]
+    logger.error(f"[{error_id}] Unhandled exception: {str(exc)}", exc_info=True)
 
     return JSONResponse(
         status_code=500,
@@ -140,58 +154,73 @@ app.add_middleware(
 security = HTTPBearer(auto_error=False)
 
 # =====================================================
-# RATE LIMITER (Supabase Logs Based)
-# 20 req/min memory
-# 3 req /2 sec memory
+# RATE LIMITER — Thread-safe, in-memory
+# 20 req / 60 sec  (sustained)
+# 3 req  /  2 sec  (burst)
+# Works on Render single-worker deployments.
 # =====================================================
 
-_rate_limit_store = defaultdict(list)
-
-RATE_LIMIT = 20
-RATE_WINDOW = 60
-
-BURST_LIMIT = 3
-BURST_WINDOW = 2
+_RATE_LIMIT   = 20   # max requests per window
+_RATE_WINDOW  = 60   # seconds
+_BURST_LIMIT  = 3    # max requests per burst window
+_BURST_WINDOW = 2    # seconds
 
 
-def check_rate_limit(user_id: str):
-    now = time.time()
+class _RateLimiter:
+    """
+    Thread-safe sliding-window rate limiter keyed by user_id.
+    Uses a threading.Lock so concurrent async workers cannot
+    bypass limits via race conditions.
+    """
 
-    # Keep only last 60 sec
-    _rate_limit_store[user_id] = [
-        t for t in _rate_limit_store[user_id]
-        if t > now - RATE_WINDOW
-    ]
+    def __init__(self):
+        self._store: Dict[str, list] = {}
+        self._lock = threading.Lock()
 
-    requests = _rate_limit_store[user_id]
+    def check(self, user_id: str) -> None:
+        """Raise HTTP 429 if the user exceeds sustained or burst limits."""
+        now = time.time()
 
-    # 20/min limit
-    if len(requests) >= RATE_LIMIT:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "success": False,
-                "message": "Rate limit exceeded."
-            }
-        )
+        with self._lock:
+            timestamps = self._store.get(user_id, [])
 
-    # 3 in 2 sec burst
-    burst = [
-        t for t in requests
-        if t > now - BURST_WINDOW
-    ]
+            # Slide window — discard timestamps older than RATE_WINDOW
+            timestamps = [t for t in timestamps if t > now - _RATE_WINDOW]
 
-    if len(burst) >= BURST_LIMIT:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "success": False,
-                "message": "Too many rapid requests."
-            }
-        )
+            # ── Sustained limit: 20 req / 60 sec ──────────────────────────
+            if len(timestamps) >= _RATE_LIMIT:
+                raise HTTPException(
+                    status_code=429,
+                    headers={"Retry-After": str(_RATE_WINDOW)},
+                    detail={
+                        "success": False,
+                        "error": "rate_limit_exceeded",
+                        "message": f"Rate limit exceeded: max {_RATE_LIMIT} requests per {_RATE_WINDOW}s.",
+                        "retry_after_seconds": _RATE_WINDOW
+                    }
+                )
 
-    requests.append(now)
-                
+            # ── Burst limit: 3 req / 2 sec ────────────────────────────────
+            burst = [t for t in timestamps if t > now - _BURST_WINDOW]
+            if len(burst) >= _BURST_LIMIT:
+                raise HTTPException(
+                    status_code=429,
+                    headers={"Retry-After": str(_BURST_WINDOW)},
+                    detail={
+                        "success": False,
+                        "error": "burst_limit_exceeded",
+                        "message": f"Too many rapid requests: max {_BURST_LIMIT} per {_BURST_WINDOW}s.",
+                        "retry_after_seconds": _BURST_WINDOW
+                    }
+                )
+
+            # Record this request
+            timestamps.append(now)
+            self._store[user_id] = timestamps
+
+
+_rate_limiter = _RateLimiter()
+
 # =====================================================
 # MODELS
 # =====================================================
@@ -326,7 +355,7 @@ async def verify_api_key(
             }
         )
 
-    check_rate_limit(key_data["user_id"])
+    _rate_limiter.check(key_data["user_id"])
 
     logger.info(
         f"API key verified user_id={key_data['user_id']}"
