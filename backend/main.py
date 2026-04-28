@@ -580,8 +580,8 @@ async def usage_metrics(current_user=Depends(get_current_user)):
         return {
             "success": True,
             "total_requests": total_requests,
-            "avg_compute_time": f"{avg_latency} ms",
-            "success_rate": f"{success_rate}%",
+            "avg_compute_time": "NEW",
+            "success_rate": "NEW_CODE_LIVE",
             "errors_today": error_count,
             "blood_requests": int(total_requests * 0.82),
             "med_requests": int(total_requests * 0.31),
