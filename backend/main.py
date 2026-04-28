@@ -566,7 +566,7 @@ async def usage_metrics(
         # -----------------------------
         success_count = len([
             r for r in rows
-            if r.get("status_code", 500) < 400
+            if (r.get("status_code") or 500) < 400
         ])
 
         success_rate = round(
@@ -581,7 +581,7 @@ async def usage_metrics(
         errors_today = len([
             r for r in rows
             if (
-                r.get("status_code", 500) >= 400 and
+                (r.get("status_code") or 500) >= 400 and
                 str(r.get("created_at", "")).startswith(str(today))
             )
         ])
