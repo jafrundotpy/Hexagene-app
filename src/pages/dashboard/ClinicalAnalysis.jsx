@@ -68,10 +68,29 @@ const ClinicalAnalysis = () => {
         body: JSON.stringify({ patient_data }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data.detail || "API Request Failed.");
+        let extractedMsg = "API Request Failed.";
+        
+        // 1. Check specific status codes as requested
+        if (response.status === 401) extractedMsg = "Invalid API key.";
+        else if (response.status === 429) extractedMsg = "Too many requests. Please wait.";
+        else if (response.status === 400) extractedMsg = "Invalid patient data.";
+        else if (response.status >= 500) extractedMsg = "Server error. Try again.";
+        // 2. Extract safely from JSON data if available
+        else if (data?.detail?.message) extractedMsg = data.detail.message;
+        else if (data?.detail) {
+          extractedMsg = typeof data.detail === "string" 
+            ? data.detail 
+            : Array.isArray(data.detail) 
+              ? data.detail.map((e) => e.msg || "Invalid field").join(", ")
+              : JSON.stringify(data.detail);
+        } else if (data?.message) {
+          extractedMsg = data.message;
+        }
+
+        throw new Error(extractedMsg);
       }
 
       setResult(data);
@@ -80,7 +99,20 @@ const ClinicalAnalysis = () => {
         window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
       }, 100);
     } catch (err) {
-      setError(err.message || "Failed to reach server.");
+      // Safe fallback for any caught error (like axios shape or network failure)
+      let finalError = "Failed to reach server.";
+      
+      if (err?.response?.data?.detail?.message) finalError = err.response.data.detail.message;
+      else if (err?.response?.data?.detail) {
+        finalError = typeof err.response.data.detail === "string" 
+          ? err.response.data.detail 
+          : JSON.stringify(err.response.data.detail);
+      }
+      else if (err?.response?.data?.message) finalError = err.response.data.message;
+      else if (err?.message) finalError = err.message;
+      
+      // Ensure we NEVER set an object to state
+      setError(typeof finalError === "object" ? JSON.stringify(finalError) : finalError);
     } finally {
       setLoading(false);
     }
