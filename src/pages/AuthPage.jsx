@@ -48,18 +48,41 @@ const AuthPage = ({ mode = "login" }) => {
       clearTimeout(timeout);
       const data = await response.json();
 
-      if (response.status === 401) {
-        setError("No account found with this email. Please sign up first.");
-        return;
-      }
-
-      if (response.status === 400) {
-        setError(data.detail || "This email is already registered. Please log in.");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Something went wrong.");
+      if (isLogin) {
+        // Login-specific status code handling
+        if (response.status === 401) {
+          setError("Invalid email or password.");
+          return;
+        }
+        if (response.status === 404) {
+          setError("Account not found. Please sign up.");
+          return;
+        }
+        if (response.status === 429) {
+          setError("Too many login attempts. Please wait and try again.");
+          return;
+        }
+        if (response.status === 500 || response.status === 502 || response.status === 503) {
+          setError("Server is starting up, please wait a moment and try again.");
+          return;
+        }
+        if (!response.ok) {
+          setError("Login failed. Please try again.");
+          return;
+        }
+      } else {
+        // Signup-specific status code handling (unchanged)
+        if (response.status === 401) {
+          setError("No account found with this email. Please sign up first.");
+          return;
+        }
+        if (response.status === 400) {
+          setError(data.detail || "This email is already registered. Please log in.");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(data.detail || "Something went wrong.");
+        }
       }
 
       if (isLogin) {
@@ -100,7 +123,7 @@ const AuthPage = ({ mode = "login" }) => {
       if (err.name === "AbortError") {
         setError("Server is starting up, please wait a moment and try again.");
       } else {
-        setError(err.message || "Failed to reach server. Please try again.");
+        setError("Connection problem. Please try again.");
       }
     } finally {
       setLoading(false);
