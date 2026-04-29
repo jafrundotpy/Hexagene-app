@@ -49,21 +49,12 @@ const ClinicalAnalysis = () => {
     setLoading(true);
 
     try {
-      const envApiKey = import.meta.env.VITE_API_KEY;
-      const localApiKey = localStorage.getItem("api_key");
-      const token = localStorage.getItem("token");
+      const apiKey = import.meta.env.VITE_API_KEY || "PASTE_REAL_API_KEY_HERE";
       
       const headers = {
         "Content-Type": "application/json",
+        "x-api-key": apiKey
       };
-
-      if (envApiKey) {
-        headers["x-api-key"] = envApiKey;
-      } else if (localApiKey) {
-        headers["x-api-key"] = localApiKey;
-      } else if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
 
       const response = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
