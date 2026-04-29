@@ -15,13 +15,44 @@ export default function Usage() {
     avg_variant_count: 0,
   });
 
+  const [healthData, setHealthData] = useState({ status: "offline" });
+  const [versionData, setVersionData] = useState({ version: "...", engine: "Loading...", ready: false });
+
   useEffect(() => {
     fetchMetrics();
+    fetchSystemStatus();
 
-    const interval = setInterval(fetchMetrics, 15000);
+    const interval = setInterval(() => {
+      fetchMetrics();
+      fetchSystemStatus();
+    }, 15000);
 
     return () => clearInterval(interval);
   }, []);
+
+  const fetchSystemStatus = async () => {
+    try {
+      const [healthRes, versionRes] = await Promise.all([
+        fetch(`${API_URL}/v2/health`).catch(() => null),
+        fetch(`${API_URL}/v2/version`).catch(() => null)
+      ]);
+
+      if (healthRes && healthRes.ok) {
+        const hData = await healthRes.json();
+        setHealthData(hData);
+      } else {
+        setHealthData({ status: "offline" });
+      }
+
+      if (versionRes && versionRes.ok) {
+        const vData = await versionRes.json();
+        setVersionData(vData);
+      }
+    } catch (error) {
+      console.error("Failed to load system status:", error);
+      setHealthData({ status: "offline" });
+    }
+  };
 
   const fetchMetrics = async () => {
     try {
@@ -361,23 +392,27 @@ export default function Usage() {
                 }}
               >
                 <div>
-                  🟢 API Status:
-                  Online
+                  {healthData?.status === "ok" ? "🟢 API Status: Online" : "🔴 API Status: Offline"}
                 </div>
 
                 <div>
-                  🔐 Auth Layer:
-                  Secure
+                  🔐 Auth Layer: Secure
                 </div>
 
                 <div>
-                  📈 Live Refresh:
-                  15 sec
+                  📈 Live Refresh: 15 sec
                 </div>
 
                 <div>
-                  🚀 Engine:
-                  HexaGene S21
+                  🚀 Engine: {versionData?.engine || "HexaGene S21"}
+                </div>
+
+                <div>
+                  📦 Version: {versionData?.version || "..."}
+                </div>
+
+                <div>
+                  ✅ Ready: {versionData?.ready ? "Yes" : "No"}
                 </div>
               </div>
             </div>
