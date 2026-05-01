@@ -385,9 +385,15 @@ async def signup(user: UserSignup):
         }
 
     except Exception as e:
+        error_msg = str(e)
+        if "23505" in error_msg or "users_email_key" in error_msg:
+            raise HTTPException(
+                status_code=400,
+                detail="Email already registered"
+            )
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=error_msg
         )
 
 @app.post("/auth/login")
