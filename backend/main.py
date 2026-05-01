@@ -1,58 +1,53 @@
 """
 HexaGene API — Production Backend
 ==================================
-Updated first section (cleaned + safe)
-Paste this for first ~300 lines
+Merged with Boss Backend Engine.
 """
+
+import logging
+import os
+import time
+import uuid
+import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Dict, Any, Union
 
 from fastapi import (
     FastAPI,
     HTTPException,
     Depends,
     Header,
-    File,
-    UploadFile,
-    Request
+    Request,
+    status
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
-
 from pydantic import BaseModel
-from typing import Dict, Any
-
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-
-import os
-import uuid
-import time
-import logging
-import threading
-from pathlib import Path
-from collections import defaultdict
-
 from dotenv import load_dotenv
+
 from supabase_client import supabase
 
 import sys
 sys.path.append(str(Path(__file__).resolve().parent))
 
-from utils.api_key import (
-    generate_api_key,
-    hash_api_key
-)
+from utils.api_key import generate_api_key, hash_api_key
 
 # =====================================================
-# CONFIG
+# CONFIG & LOGGING
 # =====================================================
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-load_dotenv(
-    dotenv_path=Path(__file__).resolve().parent / ".env"
+LOG_LEVEL = os.getenv("HEXAGENE_LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
+logger = logging.getLogger("hexagene")
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
@@ -61,12 +56,39 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY missing")
 
 # =====================================================
-# APP
+# BOSS ENGINE IMPORTS
 # =====================================================
+
+_READY = {"ok": True}
+
+from schemas import (
+    HealthResponse,
+    IntakeInput,
+    IntakeResponse,
+    PatientInput,
+    VersionResponse,
+)
+from engine_demo import BUILD, ENGINE, KERNEL_DESC, VERSION, patient_report
+from intake_demo import merge_patient
+from clinical_report_demo import generate_clinical_report
+
+# =====================================================
+# APP LIFECYCLE
+# =====================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("hexagene production starting build=%s version=%s", BUILD, VERSION)
+    if _READY["ok"]:
+        logger.info("Engine loaded successfully.")
+    yield
+    logger.info("hexagene shutdown")
 
 app = FastAPI(
     title="HexaGene API",
-    version="2.0.0"
+    version=VERSION,
+    description="Stateless deterministic patient scoring service.",
+    lifespan=lifespan,
 )
 
 # =====================================================
@@ -74,13 +96,7 @@ app = FastAPI(
 # =====================================================
 
 @app.exception_handler(Exception)
-async def safe_error_handler(
-    request: Request,
-    exc: Exception
-):
-    # CRITICAL: Do NOT swallow HTTPException — pass it through correctly.
-    # Without this, HTTPException(429) would be caught here and returned
-    # as a 500, making rate limiting appear broken.
+async def safe_error_handler(request: Request, exc: Exception):
     if isinstance(exc, HTTPException):
         content = exc.detail if isinstance(exc.detail, dict) else {
             "success": False,
@@ -92,7 +108,7 @@ async def safe_error_handler(
             headers=getattr(exc, "headers", None) or {}
         )
 
-    error_id = str(uuid.uuid4())[:8]
+    error_id = getattr(request.state, "request_id", str(uuid.uuid4())[:8])
     logger.error(f"[{error_id}] Unhandled exception: {str(exc)}", exc_info=True)
 
     return JSONResponse(
@@ -105,18 +121,36 @@ async def safe_error_handler(
     )
 
 # =====================================================
-# REQUEST LOGGER
+# MIDDLEWARE: BODY SIZE LIMIT & REQUEST LOGGING
 # =====================================================
+
+_MAX_BODY = 1 * 1024 * 1024  # 1 MB
+
+@app.middleware("http")
+async def body_size_limit(request: Request, call_next):
+    if request.method == "POST":
+        cl = request.headers.get("content-length")
+        if cl and cl.isdigit() and int(cl) > _MAX_BODY:
+            return JSONResponse(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                content={"error": "request too large", "max_bytes": _MAX_BODY},
+            )
+    return await call_next(request)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    start = time.time()
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    request.state.request_id = rid
+    t0 = time.perf_counter()
 
     response = await call_next(request)
 
-    latency = round(
-        (time.time() - start) * 1000,
-        2
+    elapsed = round((time.perf_counter() - t0) * 1000, 2)
+    response.headers["x-request-id"] = rid
+    
+    logger.info(
+        "rid=%s method=%s path=%s status=%s latency_ms=%s",
+        rid, request.method, request.url.path, response.status_code, elapsed,
     )
 
     try:
@@ -124,9 +158,8 @@ async def log_requests(request: Request, call_next):
             "endpoint": request.url.path,
             "method": request.method,
             "status_code": response.status_code,
-            "latency_ms": latency
+            "latency_ms": elapsed
         }).execute()
-
     except Exception as e:
         logger.warning(f"Log insert failed: {e}")
 
@@ -136,58 +169,37 @@ async def log_requests(request: Request, call_next):
 # CORS
 # =====================================================
 
+_CORS_ORIGINS = os.getenv("HEXAGENE_CORS_ORIGINS", "https://hexagene-app.vercel.app,http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://hexagene-app.vercel.app",
-        "http://localhost:5173"
-    ],
+    allow_origins=[o.strip() for o in _CORS_ORIGINS if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # =====================================================
-# SECURITY
+# SECURITY & RATE LIMITER
 # =====================================================
 
 security = HTTPBearer(auto_error=False)
-
-# =====================================================
-# RATE LIMITER — Thread-safe, in-memory
-# 20 req / 60 sec  (sustained)
-# 3 req  /  2 sec  (burst)
-# Works on Render single-worker deployments.
-# =====================================================
 
 _RATE_LIMIT   = 20   # max requests per window
 _RATE_WINDOW  = 60   # seconds
 _BURST_LIMIT  = 3    # max requests per burst window
 _BURST_WINDOW = 2    # seconds
 
-
 class _RateLimiter:
-    """
-    Thread-safe sliding-window rate limiter keyed by user_id.
-    Uses a threading.Lock so concurrent async workers cannot
-    bypass limits via race conditions.
-    """
-
     def __init__(self):
         self._store: Dict[str, list] = {}
         self._lock = threading.Lock()
 
     def check(self, user_id: str) -> None:
-        """Raise HTTP 429 if the user exceeds sustained or burst limits."""
         now = time.time()
-
         with self._lock:
             timestamps = self._store.get(user_id, [])
-
-            # Slide window — discard timestamps older than RATE_WINDOW
             timestamps = [t for t in timestamps if t > now - _RATE_WINDOW]
 
-            # ── Sustained limit: 20 req / 60 sec ──────────────────────────
             if len(timestamps) >= _RATE_LIMIT:
                 raise HTTPException(
                     status_code=429,
@@ -200,7 +212,6 @@ class _RateLimiter:
                     }
                 )
 
-            # ── Burst limit: 3 req / 2 sec ────────────────────────────────
             burst = [t for t in timestamps if t > now - _BURST_WINDOW]
             if len(burst) >= _BURST_LIMIT:
                 raise HTTPException(
@@ -214,15 +225,13 @@ class _RateLimiter:
                     }
                 )
 
-            # Record this request
             timestamps.append(now)
             self._store[user_id] = timestamps
-
 
 _rate_limiter = _RateLimiter()
 
 # =====================================================
-# MODELS
+# MODELS (Legacy & Auth)
 # =====================================================
 
 class UserSignup(BaseModel):
@@ -246,18 +255,13 @@ def clamp(value):
 
 def hash_password(password: str) -> str:
     import bcrypt
-
     return bcrypt.hashpw(
         password.encode("utf-8")[:72],
         bcrypt.gensalt()
     ).decode("utf-8")
 
-def verify_password(
-    password: str,
-    hashed: str
-) -> bool:
+def verify_password(password: str, hashed: str) -> bool:
     import bcrypt
-
     return bcrypt.checkpw(
         password.encode("utf-8")[:72],
         hashed.encode("utf-8")
@@ -265,112 +269,52 @@ def verify_password(
 
 def create_token(data):
     payload = data.copy()
-
-    payload["exp"] = (
-        datetime.now(timezone.utc)
-        + timedelta(hours=24)
-    )
-
-    return jwt.encode(
-        payload,
-        SECRET_KEY,
-        algorithm=ALGORITHM
-    )
+    payload["exp"] = datetime.now(timezone.utc) + timedelta(hours=24)
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 # =====================================================
-# AUTH HELPERS
+# AUTH MIDDLEWARE
 # =====================================================
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authenticated"
-        )
-
+        raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        decoded = jwt.decode(
-            credentials.credentials,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
-
-        return decoded
-
+        return jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid token"
-        )
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-async def verify_api_key(
-    x_api_key: str = Header(None)
-):
+async def verify_api_key(x_api_key: str = Header(None)):
     if not x_api_key:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "success": False,
-                "message": "Missing API key"
-            }
-        )
+        raise HTTPException(status_code=401, detail={"success": False, "message": "Missing API key"})
 
     hashed_incoming = hash_api_key(x_api_key)
-
-    res = (
-        supabase.table("api_keys")
-        .select("*")
-        .eq("api_key", hashed_incoming)
-        .eq("is_active", True)
-        .execute()
-    )
+    res = supabase.table("api_keys").select("*").eq("api_key", hashed_incoming).eq("is_active", True).execute()
 
     if not res.data:
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "success": False,
-                "message": "Invalid API key"
-            }
-        )
+        raise HTTPException(status_code=401, detail={"success": False, "message": "Invalid API key"})
 
     key_data = res.data[0]
-
-    usage_count = key_data.get(
-        "usage_count", 0
-    ) or 0
-
-    monthly_limit = key_data.get(
-        "monthly_limit", 10000
-    ) or 10000
+    usage_count = key_data.get("usage_count", 0) or 0
+    monthly_limit = key_data.get("monthly_limit", 10000) or 10000
 
     if usage_count >= monthly_limit:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "success": False,
-                "message": "Monthly quota exceeded."
-            }
-        )
+        raise HTTPException(status_code=429, detail={"success": False, "message": "Monthly quota exceeded."})
 
     _rate_limiter.check(key_data["user_id"])
-
-    logger.info(
-        f"API key verified user_id={key_data['user_id']}"
-    )
-
     return key_data
 
+def _increment_usage(key_data):
+    current_count = key_data.get("usage_count", 0) or 0
+    supabase.table("api_keys").update({"usage_count": current_count + 1}).eq("user_id", key_data["user_id"]).execute()
+
 # =====================================================
-# AUTH ROUTES
+# AUTH & USER ROUTES
 # =====================================================
 
 @app.post("/auth/signup")
 async def signup(user: UserSignup):
     user_id = str(uuid.uuid4())
-
     try:
         supabase.table("users").insert({
             "id": user_id,
@@ -378,80 +322,35 @@ async def signup(user: UserSignup):
             "name": user.name,
             "password": hash_password(user.password)
         }).execute()
-
-        return {
-            "success": True,
-            "user_id": user_id
-        }
-
+        return {"success": True, "user_id": user_id}
     except Exception as e:
         error_msg = str(e)
         if "23505" in error_msg or "users_email_key" in error_msg:
-            raise HTTPException(
-                status_code=400,
-                detail="Email already registered"
-            )
-        raise HTTPException(
-            status_code=400,
-            detail=error_msg
-        )
+            raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail=error_msg)
 
 @app.post("/auth/login")
 async def login(user: UserLogin):
-    res = (
-        supabase.table("users")
-        .select("*")
-        .eq("email", user.email)
-        .execute()
-    )
-
+    res = supabase.table("users").select("*").eq("email", user.email).execute()
     if not res.data:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
-
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     db_user = res.data[0]
-
-    if not verify_password(
-        user.password,
-        db_user["password"]
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
-
-    token = create_token({
-        "sub": db_user["email"],
-        "id": db_user["id"]
-    })
-
+    if not verify_password(user.password, db_user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token = create_token({"sub": db_user["email"], "id": db_user["id"]})
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {
-            "name": db_user["name"],
-            "email": db_user["email"]
-        }
+        "user": {"name": db_user["name"], "email": db_user["email"]}
     }
-# =====================================================
-# API KEY
-# =====================================================
 
 @app.post("/api/generate-key")
-async def generate_api_key_route(
-    current_user: dict = Depends(get_current_user)
-):
+async def generate_api_key_route(current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user["id"]
-
-        # one active key only
-        supabase.table("api_keys")\
-            .delete()\
-            .eq("user_id", user_id)\
-            .execute()
-
+        supabase.table("api_keys").delete().eq("user_id", user_id).execute()
+        
         raw_key = generate_api_key()
         hashed_key = hash_api_key(raw_key)
 
@@ -461,152 +360,43 @@ async def generate_api_key_route(
             "usage_count": 0,
             "monthly_limit": 10000,
             "is_active": True,
-            "created_at": datetime.now(
-                timezone.utc
-            ).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
-        return {
-            "success": True,
-            "api_key": raw_key,
-            "message": "Save this now. It won't be shown again."
-        }
-
+        return {"success": True, "api_key": raw_key, "message": "Save this now. It won't be shown again."}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/keys")
-async def get_user_keys(
-    current_user=Depends(get_current_user)
-):
+async def get_user_keys(current_user=Depends(get_current_user)):
     try:
-        res = (
-            supabase.table("api_keys")
-            .select("*")
-            .eq("user_id", current_user["id"])
-            .eq("is_active", True)
-            .execute()
-        )
-
-        keys = []
-
-        for k in res.data:
-            keys.append({
-                "api_key": k["api_key"],
-                "usage": k.get(
-                    "usage_count", 0
-                ),
-                "limit": k.get(
-                    "monthly_limit", 10000
-                ),
-                "created_at":
-                    k.get("created_at", "")[:10]
-                    if k.get("created_at")
-                    else ""
-            })
-
-        return {
-            "success": True,
-            "keys": keys
-        }
-
+        res = supabase.table("api_keys").select("*").eq("user_id", current_user["id"]).eq("is_active", True).execute()
+        keys = [{
+            "api_key": k["api_key"],
+            "usage": k.get("usage_count", 0),
+            "limit": k.get("monthly_limit", 10000),
+            "created_at": k.get("created_at", "")[:10] if k.get("created_at") else ""
+        } for k in res.data]
+        return {"success": True, "keys": keys}
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
-
-# =====================================================
-# HEALTH
-# =====================================================
-
-@app.get("/api/health")
-def health_check():
-    return {
-        "status": "ok"
-    }
-
-@app.get("/v2/health")
-def v2_health():
-    return {
-        "status": "ok",
-        "version": "2.0.0"
-    }
-
-@app.get("/v2/version")
-def v2_version():
-    return {
-        "version": "2.0.0",
-        "engine": "HexaGene S21",
-        "ready": True,
-        "timestamp": datetime.now(
-            timezone.utc
-        ).isoformat()
-    }
-
-# =====================================================
-# USAGE METRICS
-# =====================================================
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/usage-metrics")
 async def usage_metrics(current_user=Depends(get_current_user)):
     try:
         user_id = current_user["id"]
+        keys = supabase.table("api_keys").select("*").eq("user_id", user_id).execute()
+        total_requests = sum(int(k.get("usage_count") or 0) for k in (keys.data or []))
 
-        # API Keys
-        keys = (
-            supabase.table("api_keys")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
-
-        total_requests = sum(
-            int(k.get("usage_count") or 0)
-            for k in (keys.data or [])
-        )
-
-        # Logs
-        logs = (
-            supabase.table("usage_logs")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-        )
-
+        logs = supabase.table("usage_logs").select("*").eq("user_id", user_id).execute()
         rows = logs.data or []
+        valid_status = [r for r in rows if r.get("status_code") is not None]
+        valid_latency = [float(r.get("latency_ms")) for r in rows if r.get("latency_ms") is not None]
 
-        valid_status = [
-            r for r in rows
-            if r.get("status_code") is not None
-        ]
-
-        valid_latency = [
-            float(r.get("latency_ms"))
-            for r in rows
-            if r.get("latency_ms") is not None
-        ]
-
-        success_count = sum(
-            1 for r in valid_status
-            if int(r["status_code"]) < 400
-        )
-
-        error_count = sum(
-            1 for r in valid_status
-            if int(r["status_code"]) >= 400
-        )
-
-        success_rate = round(
-            (success_count / len(valid_status)) * 100, 1
-        ) if valid_status else 0
-
-        avg_latency = round(
-            sum(valid_latency) / len(valid_latency), 2
-        ) if valid_latency else 0
+        success_count = sum(1 for r in valid_status if int(r["status_code"]) < 400)
+        error_count = sum(1 for r in valid_status if int(r["status_code"]) >= 400)
+        success_rate = round((success_count / len(valid_status)) * 100, 1) if valid_status else 0
+        avg_latency = round(sum(valid_latency) / len(valid_latency), 2) if valid_latency else 0
 
         return {
             "success": True,
@@ -619,273 +409,106 @@ async def usage_metrics(current_user=Depends(get_current_user)):
             "variant_requests": int(total_requests * 0.12),
             "avg_variant_count": 12
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
-# LEGACY ANALYZE
+# OPS & HEALTH
+# =====================================================
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
+
+@app.get("/v2/health", response_model=HealthResponse, tags=["ops"])
+async def health():
+    return HealthResponse(status="ok", version=VERSION)
+
+@app.get("/v2/version", response_model=VersionResponse, tags=["ops"])
+async def version():
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
+    return VersionResponse(
+        version=VERSION,
+        engine=ENGINE,
+        kernel=KERNEL_DESC,
+        build=BUILD,
+        mode="production",
+    )
+
+# =====================================================
+# CORE ENGINE ROUTES (Integrated)
 # =====================================================
 
 @app.post("/api/analyze")
-async def analyze(
-    request: AnalysisRequest,
-    key_data=Depends(verify_api_key)
-):
-    data = request.patient_data
-
-    if not data:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "message":
-                "patient_data is required."
-            }
-        )
-
-    try:
-        result = run_analysis_logic(data)
-
-        current_count = key_data.get(
-            "usage_count", 0
-        ) or 0
-
-        supabase.table("api_keys").update({
-            "usage_count":
-                current_count + 1
-        }).eq(
-            "user_id",
-            key_data["user_id"]
-        ).execute()
-
-        return result
-
-    except Exception as e:
-        logger.error(
-            f"Analyze error: {str(e)}"
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail="Analyze failed"
-        )
-
-# =====================================================
-# V2 SCORE
-# =====================================================
-
-@app.post("/v2/score")
-async def v2_score(
-    request: AnalysisRequest,
-    key_data=Depends(verify_api_key)
-):
-    start = time.time()
-
-    data = request.patient_data
-
-    if not data:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "success": False,
-                "message": "patient_data is required"
-            }
-        )
-
-    try:
-        result = run_analysis_logic(data)
-
-        compute_time = round(
-            (time.time() - start) * 1000,
-            2
-        )
-
-        risk_score = result["risk_score"]
-
-        response_data = {
-            "version": "2.0.0",
-            "engine": "HexaGene S21",
-            "timestamp": datetime.now(
-                timezone.utc
-            ).isoformat(),
-
-            "compute_time_ms": compute_time,
-
-            "position": {
-                "axes": {
-                    "structural": round(result["axes"]["structural"] / 100, 3),
-                    "inflammatory": round(result["axes"]["inflammatory"] / 100, 3),
-                    "metabolic": round(result["axes"]["metabolic"] / 100, 3),
-                    "redox": round(result["axes"]["redox"] / 100, 3),
-                    "kinetic": round(result["axes"]["kinetic"] / 100, 3),
-                    "balance": round(result["axes"]["balance"] / 100, 3)
-                },
-
-                "risk_score": round(risk_score / 100, 3),
-
-                "classification":
-                    "HIGH" if risk_score >= 70
-                    else "MODERATE" if risk_score >= 50
-                    else "LOW",
-
-                "stability": "slope",
-                "discrete_state": 63,
-                "discrete_binary": "111111",
-                "tier": 3,
-
-                "confidence": {
-                    "structural": "med",
-                    "inflammatory": "med",
-                    "metabolic": "med",
-                    "redox": "med",
-                    "kinetic": "med",
-                    "balance": "med"
-                },
-
-                "missing_markers": [],
-                "present_markers": list(data.keys())
-            },
-
-            "terrain": None,
-            "forces": None
-        }
-
-        # Update usage count
-        current_count = key_data.get(
-            "usage_count", 0
-        ) or 0
-
-        supabase.table("api_keys").update({
-            "usage_count": current_count + 1
-        }).eq(
-            "user_id",
-            key_data["user_id"]
-        ).execute()
-
-        # Insert analytics log
-        supabase.table("usage_logs").insert({
-            "user_id": key_data["user_id"],
-            "endpoint": "/v2/score",
-            "method": "POST",
-            "status_code": 200,
-            "latency_ms": compute_time
-        }).execute()
-
-        return response_data
-
-    except Exception as e:
-        logger.error(
-            f"/v2/score error: {str(e)}"
-        )
-
-        # Error log also saved
-        supabase.table("usage_logs").insert({
-            "user_id": key_data["user_id"],
-            "endpoint": "/v2/score",
-            "method": "POST",
-            "status_code": 500,
-            "latency_ms": 0
-        }).execute()
-
-        raise HTTPException(
-            status_code=500,
-            detail="Scoring failed"
-        )
+async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
+    """Legacy frontend support using the new core engine."""
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
         
-# =====================================================
-# ENGINE LOGIC
-# =====================================================
+    data = request.patient_data
+    if not data:
+        raise HTTPException(status_code=400, detail={"success": False, "message": "patient_data is required."})
 
-def run_analysis_logic(data):
-    def safe_float(val, default):
-        try:
-            if val in [None, ""]:
-                return default
-            return float(val)
-        except:
-            return default
+    try:
+        report = patient_report(data)
+        _increment_usage(key_data)
+        return report
+    except Exception as e:
+        logger.error(f"Analyze error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Analyze failed")
 
-    hba1c = safe_float(
-        data.get("hba1c"), 5.9
-    )
-    crp = safe_float(
-        data.get("crp"), 2.1
-    )
-    albumin = safe_float(
-        data.get("albumin"), 4.0
-    )
-    egfr = safe_float(
-        data.get("egfr"), 90
-    )
-    rdw = safe_float(
-        data.get("rdw"), 13
-    )
-    uric = safe_float(
-        data.get("uric_acid")
-        or data.get("uricAcid"),
-        5
-    )
+@app.post("/v2/score", tags=["scoring"])
+async def v2_score(payload: Union[AnalysisRequest, PatientInput], key_data=Depends(verify_api_key)):
+    """
+    Primary scoring endpoint using the new engine. 
+    Accepts both pure PatientInput or legacy AnalysisRequest for safety.
+    """
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
 
-    inflammatory = clamp(
-        100 - (crp * 20)
-    )
-    metabolic = clamp(
-        100 - (hba1c * 10)
-    )
-    structural = clamp(albumin * 20)
-    kinetic = clamp(egfr)
-    redox = clamp(100 - (rdw * 5))
-    balance = clamp(100 - (uric * 10))
+    if isinstance(payload, AnalysisRequest):
+        body = payload.patient_data
+    else:
+        body = payload.model_dump(exclude_none=True)
 
-    metabolic -= (inflammatory * 0.1)
-    kinetic -= (inflammatory * 0.1)
-    redox -= (inflammatory * 0.15)
-    balance -= (metabolic * 0.05)
+    if not body:
+        raise HTTPException(status_code=400, detail="empty request body")
 
-    inflammatory = clamp(inflammatory)
-    metabolic = clamp(metabolic)
-    structural = clamp(structural)
-    kinetic = clamp(kinetic)
-    redox = clamp(redox)
-    balance = clamp(balance)
+    try:
+        report = patient_report(body)
+    except Exception:
+        logger.exception("engine error")
+        raise HTTPException(status_code=500, detail="engine error")
 
-    risk_score = round(
-        (
-            structural +
-            inflammatory +
-            metabolic +
-            kinetic +
-            redox +
-            balance
-        ) / 6,
-        2
-    )
+    _increment_usage(key_data)
+    return report
 
-    status = (
-        "Optimal"
-        if risk_score > 80 else
-        "Moderate"
-        if risk_score > 60 else
-        "At Risk"
-    )
+@app.post("/v2/intake", response_model=IntakeResponse, tags=["scoring"])
+async def intake(payload: IntakeInput, key_data=Depends(verify_api_key)):
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
+        
+    body = payload.model_dump(exclude_none=True)
+    if not body:
+        raise HTTPException(status_code=400, detail="empty request body")
+        
+    result = merge_patient(body)
+    _increment_usage(key_data)
+    return IntakeResponse(**result)
 
-    return {
-        "success": True,
-        "risk_score": risk_score,
-        "axes": {
-            "structural": round(structural, 2),
-            "inflammatory": round(inflammatory, 2),
-            "metabolic": round(metabolic, 2),
-            "redox": round(redox, 2),
-            "kinetic": round(kinetic, 2),
-            "balance": round(balance, 2)
-        },
-        "status": status,
-        "timestamp": datetime.now(
-            timezone.utc
-        ).isoformat()
-    }
+@app.post("/v2/report", tags=["scoring"])
+async def report_enrichment(engine_output: dict[str, Any], key_data=Depends(verify_api_key)):
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
+        
+    if not isinstance(engine_output, dict) or not engine_output:
+        raise HTTPException(status_code=400, detail="engine output dict required")
+    if "engine" not in engine_output and "version" not in engine_output:
+        raise HTTPException(status_code=400, detail="payload does not look like an engine output")
+        
+    _increment_usage(key_data)
+    return generate_clinical_report(engine_output)
 
 # =====================================================
 # ROOT
@@ -893,20 +516,8 @@ def run_analysis_logic(data):
 
 @app.get("/")
 def root():
-    return {
-        "status": "HexaGene API Running"
-    }
-
-# =====================================================
-# RUN
-# =====================================================
+    return {"status": "HexaGene API Running (Production)"}
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
