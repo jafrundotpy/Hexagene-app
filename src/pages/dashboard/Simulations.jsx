@@ -453,10 +453,7 @@ const Simulations = () => {
       });
 
       if (!response.ok) {
-        if (response.status === 404) {
-           throw new Error("No wearable data found. Please sync your device first.");
-        }
-        throw new Error("Failed to fetch wearable data.");
+        throw new Error(`Server error ${response.status}. Please try again.`);
       }
 
       const data = await response.json();
@@ -477,9 +474,15 @@ const Simulations = () => {
         albumin: data.avg_sleep_hours ? data.avg_sleep_hours.toString() : prev.albumin,
         egfr: data.hrv ? data.hrv.toString() : prev.egfr,
         hba1c: data.active_minutes ? data.active_minutes.toString() : prev.hba1c,
+        vo2max: data.vo2max ? data.vo2max.toString() : prev.vo2max,
+        recoveryScore: data.recovery_score ? data.recovery_score.toString() : prev.recoveryScore,
+        sleepScore: data.sleep_score ? data.sleep_score.toString() : prev.sleepScore,
+        sleepDebt: data.sleep_debt ? data.sleep_debt.toString() : prev.sleepDebt,
       }));
 
-      setUploadMsg("✅ Wearable data synced successfully! Click Run Complete Analysis.");
+      setUploadMsg(data._demo
+        ? "⚡ No real device data — loaded demo wearable profile. Click Run Complete Analysis."
+        : "✅ Real wearable data synced! Click Run Complete Analysis.");
     } catch (err) {
       setUploadMsg(`❌ Error: ${err.message}`);
     } finally {
