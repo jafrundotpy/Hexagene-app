@@ -249,6 +249,21 @@ class AnalysisRequest(BaseModel):
 class WearableScoreRequest(BaseModel):
     user_id: str
 
+class WearableIngestRequest(BaseModel):
+    user_id: str
+    ingest_token: str  # Simple shared secret: "hexagene-ingest-2026"
+    daily_steps: Optional[float] = None
+    resting_heart_rate: Optional[float] = None
+    avg_sleep_hours: Optional[float] = None
+    hrv: Optional[float] = None
+    active_minutes: Optional[float] = None
+    stress_score: Optional[float] = None
+    spo2: Optional[float] = None
+    calories_burned: Optional[float] = None
+    age: Optional[int] = None
+    sex: Optional[str] = None
+    source: Optional[str] = "apple_health"
+
 # =====================================================
 # HELPERS
 # =====================================================
@@ -585,6 +600,46 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
         
     _increment_usage(key_data)
     return report
+
+# =====================================================
+# WEARABLE INGEST — for n8n / Apple Health / QRing
+# =====================================================
+
+INGEST_TOKEN = "hexagene-ingest-2026"
+
+@app.post("/v2/ingest-wearable", tags=["ingest"])
+async def ingest_wearable(payload: WearableIngestRequest):
+    """
+    Public endpoint (no API key) — secured by ingest_token.
+    Called by n8n after receiving Apple Health data from iPhone Shortcut.
+    Writes/updates wearable_metrics row in Supabase for the given user_id.
+    """
+    if payload.ingest_token != INGEST_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid ingest token")
+
+    row = {"user_id": payload.user_id, "source": payload.source or "apple_health"}
+    for field in ["daily_steps", "resting_heart_rate", "avg_sleep_hours",
+                  "hrv", "active_minutes", "stress_score", "spo2",
+                  "calories_burned", "age", "sex"]:
+        val = getattr(payload, field, None)
+        if val is not None:
+            row[field] = val
+
+    try:
+        # Insert new row — keeps history; latest row is always fetched by score endpoint
+        result = supabase.table("wearable_metrics").insert(row).execute()
+        inserted = result.data[0] if result.data else {}
+        logger.info(f"Wearable ingested for user {payload.user_id}: {row}")
+        return {
+            "status": "ok",
+            "message": "Wearable data ingested successfully",
+            "row_id": inserted.get("id"),
+            "user_id": payload.user_id,
+            "fields_written": list(row.keys()),
+        }
+    except Exception as e:
+        logger.exception("Failed to insert wearable data")
+        raise HTTPException(status_code=500, detail=f"Supabase insert failed: {str(e)}")
 
 # =====================================================
 # ROOT
