@@ -6,6 +6,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import DashboardHeader from "../../components/dashboard/DashboardHeader";
 import API_URL from "../../api/config";
 
@@ -112,6 +113,77 @@ const ClinicalAnalysis = () => {
     }
   };
 
+  const handleWearableAnalyze = async () => {
+    setError(null);
+    setResult(null);
+    setLoading(true);
+
+    try {
+      const apiKey = import.meta.env.VITE_API_KEY || "PASTE_REAL_API_KEY_HERE";
+      
+      const token = localStorage.getItem("token");
+      let userId = "demo-user";
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.id) userId = payload.id;
+        } catch (e) {
+          console.error("Failed to decode token", e);
+        }
+      }
+      
+      const headers = {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey
+      };
+
+      const response = await fetch(`${API_URL}/v2/score-from-wearable`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        let extractedMsg = "API Request Failed.";
+        if (response.status === 401) extractedMsg = "Invalid API key.";
+        else if (response.status === 429) extractedMsg = "Too many requests. Please wait.";
+        else if (response.status === 404) extractedMsg = "No wearable data found for this user.";
+        else if (response.status >= 500) extractedMsg = "Server error. Try again.";
+        else if (data?.detail?.message) extractedMsg = data.detail.message;
+        else if (data?.detail) {
+          extractedMsg = typeof data.detail === "string" 
+            ? data.detail 
+            : Array.isArray(data.detail) 
+              ? data.detail.map((e) => e.msg || "Invalid field").join(", ")
+              : JSON.stringify(data.detail);
+        } else if (data?.message) {
+          extractedMsg = data.message;
+        }
+        throw new Error(extractedMsg);
+      }
+
+      setResult(data);
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }, 100);
+    } catch (err) {
+      let finalError = "Failed to reach server.";
+      if (err?.response?.data?.detail?.message) finalError = err.response.data.detail.message;
+      else if (err?.response?.data?.detail) {
+        finalError = typeof err.response.data.detail === "string" 
+          ? err.response.data.detail 
+          : JSON.stringify(err.response.data.detail);
+      }
+      else if (err?.response?.data?.message) finalError = err.response.data.message;
+      else if (err?.message) finalError = err.message;
+      setError(typeof finalError === "object" ? JSON.stringify(finalError) : finalError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-transparent p-4 lg:p-8 max-w-[1600px] mx-auto text-white relative overflow-hidden">
       {/* Glow Background */}
@@ -177,7 +249,14 @@ const ClinicalAnalysis = () => {
             ))}
           </div>
 
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-end gap-4">
+            <button
+              onClick={handleWearableAnalyze}
+              disabled={loading}
+              className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Analyze Wearable Data
+            </button>
             <button
               onClick={handleAnalyze}
               disabled={loading}
@@ -201,7 +280,7 @@ const ClinicalAnalysis = () => {
       {/* RESULTS SECTION */}
       {result && (
         <section className="mt-8 animate-in slide-in-from-bottom-8 duration-700">
-          <div className="grid lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid lg:grid-cols-5 gap-6 mb-8">
             <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
               <span className="text-slate-400 text-sm font-medium">Risk Score</span>
               <div className="text-4xl font-bold mt-2 text-cyan-400">
@@ -215,40 +294,71 @@ const ClinicalAnalysis = () => {
               </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
+              <span className="text-slate-400 text-sm font-medium">Completeness</span>
+              <div className="text-3xl font-bold mt-2 text-purple-400">
+                {(result.position.completeness * 100).toFixed(0)}%
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
+              <span className="text-slate-400 text-sm font-medium">Data Tier</span>
+              <div className="text-3xl font-bold mt-2 text-purple-400">
+                Tier {result.position.tier}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
               <span className="text-slate-400 text-sm font-medium">Compute Time</span>
               <div className="text-3xl font-bold mt-2 text-white flex items-center gap-2">
                 <Clock size={24} className="text-cyan-400" />
                 {result.compute_time_ms}ms
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
-              <span className="text-slate-400 text-sm font-medium">Engine</span>
-              <div className="text-2xl font-bold mt-2 text-white">
-                {result.engine}
-              </div>
-            </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <Zap className="text-cyan-400" size={24} />
-              6-Axis Biomarker Position
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.entries(result.position.axes).map(([key, value]) => (
-                <div key={key} className="bg-black/20 border border-white/10 p-5 rounded-xl">
-                  <div className="flex justify-between text-sm mb-3">
-                    <span className="capitalize text-slate-300">{key}</span>
-                    <span className="font-semibold text-cyan-400">{(value * 100).toFixed(0)}%</span>
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                <Zap className="text-cyan-400" size={24} />
+                6-Axis Biomarker Position
+              </h2>
+              <div className="grid grid-cols-1 gap-6">
+                {Object.entries(result.position.axes).map(([key, value]) => (
+                  <div key={key} className="bg-black/20 border border-white/10 p-5 rounded-xl">
+                    <div className="flex justify-between text-sm mb-3">
+                      <span className="capitalize text-slate-300">{key}</span>
+                      <span className="font-semibold text-cyan-400">{(value * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-1000"
+                        style={{ width: `${value * 100}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="h-2.5 rounded-full bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-1000"
-                      style={{ width: `${value * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+            
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl flex flex-col">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                <Activity className="text-purple-400" size={24} />
+                Radar Visualization
+              </h2>
+              <div className="flex-1 w-full min-h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={
+                    Object.entries(result.position.axes).map(([key, value]) => ({
+                      subject: key.charAt(0).toUpperCase() + key.slice(1),
+                      A: value * 100,
+                      fullMark: 100,
+                    }))
+                  }>
+                    <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 13 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.3)' }} />
+                    <Radar name="Axes" dataKey="A" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.4} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </section>
