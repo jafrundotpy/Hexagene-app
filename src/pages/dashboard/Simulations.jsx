@@ -428,6 +428,65 @@ const Simulations = () => {
     setAnalysisRun(true);
   };
 
+  const handleSyncWearable = async () => {
+    try {
+      const apiKey = "merlin123merlin123";
+      const token = localStorage.getItem("token");
+      let userId = "demo-user";
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.id) userId = payload.id;
+        } catch (e) {}
+      }
+
+      setUploadMsg("Syncing wearable data...");
+      setUploading(true);
+
+      const response = await fetch(`${API_BASE}/v2/wearable-data`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+           throw new Error("No wearable data found. Please sync your device first.");
+        }
+        throw new Error("Failed to fetch wearable data.");
+      }
+
+      const data = await response.json();
+      
+      // Auto-fill the form with wearable data
+      setForm(prev => ({
+        ...prev,
+        age: data.age ? data.age.toString() : prev.age,
+        sex: data.sex ? (data.sex === "male" ? "M" : "F") : prev.sex,
+        dailySteps: data.daily_steps ? data.daily_steps.toString() : prev.dailySteps,
+        restingHR: data.resting_heart_rate ? data.resting_heart_rate.toString() : prev.restingHR,
+        sleepDuration: data.avg_sleep_hours ? data.avg_sleep_hours.toString() : prev.sleepDuration,
+        hrv: data.hrv ? data.hrv.toString() : prev.hrv,
+        activeMinutes: data.active_minutes ? data.active_minutes.toString() : prev.activeMinutes,
+        
+        // Visual mapping to blood markers to match the backend logic for demo purposes
+        crp: data.resting_heart_rate ? data.resting_heart_rate.toString() : prev.crp,
+        albumin: data.avg_sleep_hours ? data.avg_sleep_hours.toString() : prev.albumin,
+        egfr: data.hrv ? data.hrv.toString() : prev.egfr,
+        hba1c: data.active_minutes ? data.active_minutes.toString() : prev.hba1c,
+      }));
+
+      setUploadMsg("✅ Wearable data synced successfully! Click Run Complete Analysis.");
+    } catch (err) {
+      setUploadMsg(`❌ Error: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleFileUpload = (file) => {
     // OCR feature is temporarily disabled
     setUploadMsg("🚧 Screenshot OCR feature is under development. Please enter data manually.");
@@ -563,8 +622,14 @@ const Simulations = () => {
                 </div>
                 <div style={{display:"flex",gap:"12px",marginTop:"1.5rem"}}>
                   <button onClick={handleLoadRandom} style={{flex:1,padding:"12px",borderRadius:"10px",border:"1px solid rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.05)",color:"#94a3b8",cursor:"pointer",fontSize:"13px",fontWeight:"600"}}>🎲 Load Random</button>
+                  <button onClick={handleSyncWearable} style={{flex:1.5,padding:"12px",borderRadius:"10px",border:"none",background:"linear-gradient(135deg,#a855f7,#6366f1)",color:"#fff",cursor:"pointer",fontSize:"13px",fontWeight:"700",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+                    {uploading ? (
+                      <><div style={{width:"14px",height:"14px",border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#fff",borderRadius:"50%",animation:"spin 1s linear infinite"}}/> Syncing...</>
+                    ) : "⌚ Sync Wearable Data"}
+                  </button>
                   <button onClick={handleRunAnalysis} style={{flex:2,padding:"12px",borderRadius:"10px",border:"none",background:"linear-gradient(135deg,#4fc3f7,#0ea5e9)",color:"#fff",cursor:"pointer",fontSize:"13px",fontWeight:"800"}}>🧬 RUN COMPLETE ANALYSIS</button>
                 </div>
+                <style dangerouslySetInnerHTML={{__html: "@keyframes spin { to { transform: rotate(360deg); } }"}} />
               </div>
             </div>
             <div style={{position:"sticky",top:"20px"}}>

@@ -530,6 +530,16 @@ async def report_enrichment(engine_output: dict[str, Any], key_data=Depends(veri
     _increment_usage(key_data)
     return generate_clinical_report(engine_output)
 
+@app.post("/v2/wearable-data", tags=["scoring"])
+async def get_wearable_data(request: WearableScoreRequest, key_data=Depends(verify_api_key)):
+    """
+    Returns the raw wearable data for the user to sync with frontend boxes.
+    """
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
+    row = fetch_latest_wearable(request.user_id)
+    return row
+
 @app.post("/v2/score-from-wearable", tags=["scoring"])
 async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(verify_api_key)):
     """
