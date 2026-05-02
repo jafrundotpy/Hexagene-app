@@ -285,7 +285,7 @@ def _terrain_block(variants: Optional[list[Any]], seed: str) -> Optional[dict[st
 
     return {
         "variants": out_variants,
-        "formula": "F3 × tier_J5 × (bond_E/E_max) × pro_factor",
+        "formula": "F3 \u00d7 tier_J5 \u00d7 (bond_E/E_max) \u00d7 pro_factor",
         "auc": 0.6655,
         "n_scored": len(out_variants),
     }
