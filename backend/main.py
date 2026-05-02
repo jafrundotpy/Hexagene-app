@@ -246,6 +246,9 @@ class UserLogin(BaseModel):
 class AnalysisRequest(BaseModel):
     patient_data: Dict[str, Any]
 
+class WearableScoreRequest(BaseModel):
+    user_id: str
+
 # =====================================================
 # HELPERS
 # =====================================================
@@ -271,6 +274,31 @@ def create_token(data):
     payload = data.copy()
     payload["exp"] = datetime.now(timezone.utc) + timedelta(hours=24)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+def fetch_latest_wearable(user_id: str) -> dict:
+    res = supabase.table("wearable_metrics").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="No wearable metrics found for user")
+    return res.data[0]
+
+def wearable_to_patient_input(row: dict) -> dict:
+    blood = {
+        "kinetic_index": float(row.get("daily_steps") if row.get("daily_steps") is not None else 0),
+        "pulse_rest": float(row.get("resting_heart_rate") if row.get("resting_heart_rate") is not None else 70),
+        "recovery_sleep": float(row.get("avg_sleep_hours") if row.get("avg_sleep_hours") is not None else 7),
+        "autonomic_balance": float(row.get("hrv") if row.get("hrv") is not None else 50),
+        "stress_load": float(row.get("stress_score") if row.get("stress_score") is not None else 30),
+        "oxygen_status": float(row.get("spo2") if row.get("spo2") is not None else 98),
+        "energy_output": float(row.get("calories_burned") if row.get("calories_burned") is not None else 300),
+        "movement_minutes": float(row.get("active_minutes") if row.get("active_minutes") is not None else 20),
+    }
+    return {
+        "age": row.get("age"),
+        "sex": row.get("sex"),
+        "blood": blood,
+        "medications": [],
+        "variants": []
+    }
 
 # =====================================================
 # AUTH MIDDLEWARE
@@ -509,6 +537,27 @@ async def report_enrichment(engine_output: dict[str, Any], key_data=Depends(veri
         
     _increment_usage(key_data)
     return generate_clinical_report(engine_output)
+
+@app.post("/v2/score-from-wearable", tags=["scoring"])
+async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(verify_api_key)):
+    """
+    Retrieves the latest wearable metrics for a given user_id, formats the data into a Patient schema,
+    and forwards it directly to the scoring engine.
+    """
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
+        
+    row = fetch_latest_wearable(request.user_id)
+    patient_data = wearable_to_patient_input(row)
+    
+    try:
+        report = patient_report(patient_data)
+    except Exception as e:
+        logger.exception("engine error")
+        raise HTTPException(status_code=500, detail="engine error")
+        
+    _increment_usage(key_data)
+    return report
 
 # =====================================================
 # ROOT
