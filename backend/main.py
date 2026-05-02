@@ -316,25 +316,15 @@ async def verify_api_key(x_api_key: str = Header(None)):
     if not x_api_key:
         raise HTTPException(status_code=401, detail={"success": False, "message": "Missing API key"})
 
-    hashed_incoming = hash_api_key(x_api_key)
-    res = supabase.table("api_keys").select("*").eq("api_key", hashed_incoming).eq("is_active", True).execute()
-
-    if not res.data:
+    expected_key = os.getenv("HEXAGENE_API_KEY")
+    if not expected_key or x_api_key != expected_key:
         raise HTTPException(status_code=401, detail={"success": False, "message": "Invalid API key"})
 
-    key_data = res.data[0]
-    usage_count = key_data.get("usage_count", 0) or 0
-    monthly_limit = key_data.get("monthly_limit", 10000) or 10000
-
-    if usage_count >= monthly_limit:
-        raise HTTPException(status_code=429, detail={"success": False, "message": "Monthly quota exceeded."})
-
-    _rate_limiter.check(key_data["user_id"])
-    return key_data
+    _rate_limiter.check("project_key")
+    return {"user_id": "project_key", "usage_count": 0, "monthly_limit": 9999999}
 
 def _increment_usage(key_data):
-    current_count = key_data.get("usage_count", 0) or 0
-    supabase.table("api_keys").update({"usage_count": current_count + 1}).eq("user_id", key_data["user_id"]).execute()
+    pass
 
 # =====================================================
 # AUTH & USER ROUTES
