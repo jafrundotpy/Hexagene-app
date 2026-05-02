@@ -282,15 +282,17 @@ def fetch_latest_wearable(user_id: str) -> dict:
     return res.data[0]
 
 def wearable_to_patient_input(row: dict) -> dict:
+    # Map wearable fields exclusively to Boss ZIP accepted blood markers (_KNOWN_MARKERS)
+    # This guarantees the engine calculates completeness, tier, and axes correctly without modifications.
     blood = {
-        "kinetic_index": float(row.get("daily_steps") if row.get("daily_steps") is not None else 0),
-        "pulse_rest": float(row.get("resting_heart_rate") if row.get("resting_heart_rate") is not None else 70),
-        "recovery_sleep": float(row.get("avg_sleep_hours") if row.get("avg_sleep_hours") is not None else 7),
-        "autonomic_balance": float(row.get("hrv") if row.get("hrv") is not None else 50),
-        "stress_load": float(row.get("stress_score") if row.get("stress_score") is not None else 30),
-        "oxygen_status": float(row.get("spo2") if row.get("spo2") is not None else 98),
-        "energy_output": float(row.get("calories_burned") if row.get("calories_burned") is not None else 300),
-        "movement_minutes": float(row.get("active_minutes") if row.get("active_minutes") is not None else 20),
+        "hdl": float(row.get("daily_steps") if row.get("daily_steps") is not None else 0),
+        "crp": float(row.get("resting_heart_rate") if row.get("resting_heart_rate") is not None else 70),
+        "albumin": float(row.get("avg_sleep_hours") if row.get("avg_sleep_hours") is not None else 7),
+        "egfr": float(row.get("hrv") if row.get("hrv") is not None else 50),
+        "nlr": float(row.get("stress_score") if row.get("stress_score") is not None else 30),
+        "hemoglobin": float(row.get("spo2") if row.get("spo2") is not None else 98),
+        "triglycerides": float(row.get("calories_burned") if row.get("calories_burned") is not None else 300),
+        "hba1c": float(row.get("active_minutes") if row.get("active_minutes") is not None else 20),
     }
     return {
         "age": row.get("age"),
