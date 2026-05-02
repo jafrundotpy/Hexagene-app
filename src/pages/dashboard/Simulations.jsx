@@ -356,57 +356,68 @@ const Simulations = () => {
 
   const handleRunAnalysis = async () => {
     try {
-      const apiKey = localStorage.getItem("api_key");
-
-      if (!apiKey) {
-        alert("No API key found. Please login again.");
-        return;
+      const apiKey = "merlin123merlin123"; // Fixed project API key
+      const token = localStorage.getItem("token");
+      let userId = "demo-user";
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.id) userId = payload.id;
+        } catch (e) {
+          console.error("Failed to decode token", e);
+        }
       }
 
-      console.log("Form data:", form);
-      const response = await fetch(`${API_BASE}/api/analyze`, {
+      console.log("Fetching wearable data for:", userId);
+      const response = await fetch(`${API_BASE}/v2/score-from-wearable`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": apiKey
         },
-        body: JSON.stringify({
-          patient_data: form
-        })
+        body: JSON.stringify({ user_id: userId })
       });
 
       if (!response.ok) {
-        const err = await response.text();
-        throw new Error(err);
+        if (response.status === 404) {
+           throw new Error("No wearable data found. Please sync your device first.");
+        }
+        const errText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errText}`);
       }
 
       const data = await response.json();
-      console.log("Analysis result:", data);
+      console.log("Wearable Analysis result:", data);
 
-      if (data?.axes) {
-        const axes = data.axes;
+      // Boss engine v2 returns data inside 'position' block
+      const pos = data.position || data;
+      
+      if (pos?.axes) {
+        // Map decimal values (0-1) to percentages (0-100) for the UI
+        const mappedAxes = {
+          structural: (pos.axes.structural || 0) * 100,
+          inflammatory: (pos.axes.inflammatory || 0) * 100,
+          metabolic: (pos.axes.metabolic || 0) * 100,
+          redox: (pos.axes.redox || 0) * 100,
+          kinetic: (pos.axes.kinetic || 0) * 100,
+          balance: (pos.axes.balance || 0) * 100,
+        };
 
-        const avgScore = Math.round(
-          (
-            axes.inflammatory +
-            axes.metabolic +
-            axes.redox +
-            axes.kinetic +
-            axes.balance +
-            axes.structural
-          ) / 6
-        );
-
-        setRiskScore(data.risk_score ?? avgScore);
-        setAnalysisData(data);
+        const score = pos.risk_score ? Math.round(pos.risk_score * 100) : 50;
+        setRiskScore(score);
+        
+        // Wrap for compatibility with the rest of Simulations.jsx
+        setAnalysisData({ ...data, axes: mappedAxes, risk_score: score });
         setAnalysisRun(true);
 
-        console.log("Extracted axes:", axes);
+        console.log("Extracted mapped axes:", mappedAxes);
+      } else {
+        throw new Error("Invalid response format from engine.");
       }
 
     } catch (err) {
       console.error("Analyze error:", err);
-      alert("Backend connection failed: " + err.message);
+      alert("Wearable connection failed: " + err.message);
     }
   };
 
