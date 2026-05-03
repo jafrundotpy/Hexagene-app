@@ -482,7 +482,7 @@ const Simulations = () => {
 
       setUploadMsg(data._demo
         ? "⚡ No real device data — loaded demo wearable profile. Click Run Complete Analysis."
-        : "✅ Real wearable data synced! Click Run Complete Analysis.");
+        : `✅ Real wearable data synced (${new Date().toLocaleTimeString()})! Click Run Complete Analysis.`);
     } catch (err) {
       setUploadMsg(`❌ Error: ${err.message}`);
     } finally {
@@ -641,7 +641,19 @@ const Simulations = () => {
                   <>
                     <CircleRisk score={riskScore}/>
                     <div style={{marginTop:"1.5rem",padding:"12px 16px",borderRadius:"10px",background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.06)",fontSize:"12px",color:"#64748b",fontFamily:"monospace"}}>
-                      S21 State: σ=7 | Status: STABLE Ω₂₁
+                      S21 State: σ=7 | Status: {analysisData?.classification || "STABLE"} {analysisData?.tier || "Ω₂₁"}
+                    </div>
+                    {analysisData?.wearable_data && (
+                      <div style={{marginTop:"0.75rem",fontSize:"10px",color:"#475569",textTransform:"uppercase",letterSpacing:"0.5px"}}>
+                        Last Sync: {new Date(analysisData.wearable_data.created_at).toLocaleString()} via {analysisData.wearable_data.source || "device"}
+                      </div>
+                    )}
+                    <div style={{marginTop:"1.5rem",textAlign:"left"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                        <span style={S.label}>Engine Completeness</span>
+                        <span style={{fontSize:"11px",fontWeight:"700",color:"#4fc3f7"}}>{Math.round((analysisData?.completeness || 0) * 100)}%</span>
+                      </div>
+                      <ProgressBar value={(analysisData?.completeness || 0) * 100} color="#4fc3f7" />
                     </div>
                     <div style={{marginTop:"1.5rem",textAlign:"left"}}>
                       <SecTitle icon="⚡" label="Quick Insights"/>

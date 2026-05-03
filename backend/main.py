@@ -250,7 +250,8 @@ class WearableScoreRequest(BaseModel):
     user_id: str
 
 class WearableIngestRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
+    email: Optional[str] = None  # New: allow n8n to send email instead of UUID
     ingest_token: str  # Simple shared secret: "hexagene-ingest-2026"
     daily_steps: Optional[float] = None
     resting_heart_rate: Optional[float] = None
@@ -594,6 +595,8 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
     
     try:
         report = patient_report(patient_data)
+        # Include raw wearable row so UI can show sync time/source
+        report["wearable_data"] = row
     except Exception as e:
         logger.exception("engine error")
         raise HTTPException(status_code=500, detail="engine error")
@@ -617,7 +620,22 @@ async def ingest_wearable(payload: WearableIngestRequest):
     if payload.ingest_token != INGEST_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid ingest token")
 
-    row = {"user_id": payload.user_id, "source": payload.source or "apple_health"}
+    target_user_id = payload.user_id
+
+    # Smart Resolution: If no user_id, try to find by email (easier for n8n/shortcuts)
+    if not target_user_id and payload.email:
+        try:
+            res = supabase.table("users").select("id").eq("email", payload.email).limit(1).execute()
+            if res.data:
+                target_user_id = res.data[0]["id"]
+                logger.info(f"Resolved email {payload.email} to UUID {target_user_id}")
+        except Exception as e:
+            logger.error(f"Failed to resolve email {payload.email}: {e}")
+
+    if not target_user_id:
+        raise HTTPException(status_code=400, detail="Missing user_id or valid email")
+
+    row = {"user_id": target_user_id, "source": payload.source or "apple_health"}
     for field in ["daily_steps", "resting_heart_rate", "avg_sleep_hours",
                   "hrv", "active_minutes", "stress_score", "spo2",
                   "calories_burned", "age", "sex"]:
@@ -629,12 +647,12 @@ async def ingest_wearable(payload: WearableIngestRequest):
         # Insert new row — keeps history; latest row is always fetched by score endpoint
         result = supabase.table("wearable_metrics").insert(row).execute()
         inserted = result.data[0] if result.data else {}
-        logger.info(f"Wearable ingested for user {payload.user_id}: {row}")
+        logger.info(f"Wearable ingested for user {target_user_id}: {row}")
         return {
             "status": "ok",
             "message": "Wearable data ingested successfully",
             "row_id": inserted.get("id"),
-            "user_id": payload.user_id,
+            "user_id": target_user_id,
             "fields_written": list(row.keys()),
         }
     except Exception as e:
