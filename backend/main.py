@@ -329,14 +329,37 @@ _DEMO_WEARABLE = {
 
 def fetch_latest_wearable(user_id: str) -> dict:
     try:
-        # FOR DEMO: Always fetch the absolute latest row regardless of user_id
-        res = supabase.table("wearable_metrics").select("*").order("created_at", desc=True).limit(1).execute()
+        # 1. Try to fetch the latest record SPECIFICALLY for this user
+        res = supabase.table("wearable_metrics").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
         if res.data:
             return res.data[0]
+        
+        # 2. If no data exists for this user, CREATE a random baseline for them (Demo Simulation)
+        import random
+        random_row = {
+            "user_id": user_id,
+            "age": random.randint(22, 55),
+            "sex": random.choice(["M", "F"]),
+            "daily_steps": random.randint(3000, 12000),
+            "resting_heart_rate": random.randint(55, 85),
+            "avg_sleep_hours": round(random.uniform(5.5, 8.5), 1),
+            "hrv": random.randint(30, 85),
+            "active_minutes": random.randint(10, 60),
+            "stress_score": random.randint(15, 65),
+            "spo2": random.randint(95, 99),
+            "calories_burned": random.randint(200, 600),
+            "source": "demo_auto_gen"
+        }
+        
+        logger.info(f"New user {user_id} detected. Generating and seeding random wearable data.")
+        insert_res = supabase.table("wearable_metrics").insert(random_row).execute()
+        if insert_res.data:
+            return insert_res.data[0]
+            
     except Exception as e:
-        logger.warning(f"Supabase wearable fetch failed: {e} — using demo data")
-    # Fallback: return demo data so the Boss engine always has input to score
-    logger.info(f"No wearable data found — returning demo data")
+        logger.warning(f"Supabase wearable logic failed: {e} — falling back to static demo data")
+    
+    # Absolute fallback: return static demo data if DB is down
     return {**_DEMO_WEARABLE, "user_id": user_id}
 
 def wearable_to_patient_input(row: dict) -> dict:
