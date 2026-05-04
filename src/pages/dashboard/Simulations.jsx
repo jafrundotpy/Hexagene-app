@@ -349,7 +349,7 @@ const Simulations = () => {
   const [analysisData,setAnalysisData] = useState(null);
   const [analysisRun,setAnalysisRun] = useState(false);
   const [uploading,setUploading] = useState(false);
-  const [uploadMsg,setUploadMsg] = useState("🚧 Screenshot OCR feature is under development. Please enter data manually.");
+  const [uploadMsg,setUploadMsg] = useState(null);
   const [dragOver,setDragOver] = useState(false);
   const fileRef = useRef();
 
