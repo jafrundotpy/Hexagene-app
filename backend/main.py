@@ -11,7 +11,7 @@ import uuid
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 
 from fastapi import (
     FastAPI,
