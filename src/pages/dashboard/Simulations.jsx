@@ -438,8 +438,9 @@ const Simulations = () => {
   const handleLoadRandom = () => {
     const r=generateRandomForm();
     setForm(r);
-    setRiskScore(calcRisk(r));
-    setAnalysisRun(true);
+    // Analysis is now only triggered by the "Run Complete Analysis" button
+    setAnalysisRun(false);
+    setUploadMsg("Random data loaded. Click 'Run Complete Analysis' to score.");
   };
 
   const handleSyncWearable = async () => {
@@ -502,12 +503,7 @@ const Simulations = () => {
         sleepDebt: data.sleep_debt ? data.sleep_debt.toString() : prev.sleepDebt,
       }));
 
-      setUploadMsg("Last synced: just now");
-
-      // Automatically trigger existing analysis function
-      setTimeout(() => {
-        handleRunAnalysis();
-      }, 500);
+      setUploadMsg("✅ Wearable data synced! Click 'Run Complete Analysis' below.");
 
     } catch (err) {
       setUploadMsg(`❌ Error: ${err.message}`);
@@ -560,12 +556,7 @@ const Simulations = () => {
         hba1c: data.active_minutes !== undefined ? data.active_minutes.toString() : prev.hba1c,
       }));
       
-      setUploadMsg("✅ Screenshot analyzed successfully! Results updated.");
-      
-      // Automatically trigger analysis
-      setTimeout(() => {
-        handleRunAnalysis();
-      }, 500);
+      setUploadMsg("✅ Screenshot analyzed! Click 'Run Complete Analysis' below.");
       
     } catch (err) {
       console.error("OCR Error:", err);
