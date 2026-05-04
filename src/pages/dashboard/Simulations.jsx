@@ -580,14 +580,21 @@ const Simulations = () => {
       balance: analysisData.axes?.balance ?? 0,
     }
   : calcS21(form);
-  const readiness = calcReadiness(form);
+
   const risk = riskScore || calcRisk(form);
 
+  const readiness = {
+    energy: Math.min(100, Math.max(10, (parseInt(form.sleepScore||60)*0.5 + parseInt(form.hrv||40)*0.3 + (100-risk)*0.2))),
+    work: Math.min(100, Math.max(10, (parseInt(form.sleepScore||60)*0.4 + parseInt(form.hrv||40)*0.4 + (100-risk)*0.2))),
+    exercise: Math.min(100, Math.max(10, (parseInt(form.recoveryScore||50)*0.5 + parseInt(form.hrv||40)*0.3 + parseInt(form.activeMinutes||30)*0.2))),
+  };
+
   const getLifestyleRecs = () => {
-    const highCRP = parseFloat(form.crp||0)>3;
-    const highHbA1c = parseFloat(form.hba1c||0)>6.5;
-    const lowSteps = parseInt(form.dailySteps||0)<5000;
-    const lowSleep = parseFloat(form.sleepDuration||0)<6;
+    const highCRP = parseFloat(form.crp||0)>3 || s21.inflammatory > 60;
+    const highHbA1c = parseFloat(form.hba1c||0)>6.5 || s21.metabolic > 60;
+    const lowSteps = parseInt(form.dailySteps||0)<5000 || s21.kinetic < 40;
+    const lowSleep = parseFloat(form.sleepDuration||0)<6 || s21.balance < 40;
+    
     return {
       nutrition: highCRP
         ? "Anti-inflammatory Protocol: Mediterranean diet with omega-3 rich fish, leafy greens, berries, and turmeric. Limit processed foods and sugar."
@@ -596,6 +603,8 @@ const Simulations = () => {
         : "Protein Optimization: Increase high-quality protein intake to 1.2-1.6g/kg body weight. Consider collagen supplementation.",
       exercise: lowSteps
         ? "Progressive Activity: Start with 20-30 min daily walks, gradually increase. Avoid prolonged sitting. Target 8,000+ steps."
+        : s21.kinetic > 70 
+        ? "Performance Phase: Advanced strength training (75-85% 1RM), explosive movements, and zone 3-4 metabolic conditioning."
         : "Moderate Training: Steady-state cardio, moderate strength training 60-75% 1RM, flexibility work. Good training day.",
       lifestyle: lowSleep
         ? "Sleep Priority: Establish consistent sleep schedule, avoid screens 1hr before bed, keep room cool and dark."
@@ -605,13 +614,15 @@ const Simulations = () => {
 
   const getActivities = () => {
     const r = readiness.exercise;
-    const isHigh = r >= 70;
-    const isMed = r >= 45;
+    const isHigh = r >= 75;
+    const isMed = r >= 50;
+    const isCrisis = risk > 75;
+    
     return [
-      {icon:"🌅",title:"Morning Power Routine",desc:isHigh?"Start with 10-15 min dynamic stretching, cold shower, and protein-rich breakfast.":"Start with 5-10 minutes of dynamic stretching, followed by cold shower and protein-rich breakfast.",timing:"7:00 AM - 7:30 AM",strain:isHigh?"MODERATE STRAIN":"LOW STRAIN",strainColor:isHigh?"#f59e0b":"#22c55e"},
-      {icon:"🏃",title:isHigh?"High Intensity Exercise":isMed?"Moderate Exercise":"Light Movement",desc:isHigh?"45-60 min strength training or HIIT. Push to 75-85% max effort. Optimal performance window.":isMed?"30-45 minutes moderate cardio or light strength training. Listen to your body's signals.":"20-30 min gentle walk or yoga. Keep heart rate below 60% max. Focus on mobility.",timing:"Based on schedule",strain:isHigh?"HIGH STRAIN":isMed?"MODERATE STRAIN":"LOW STRAIN",strainColor:isHigh?"#ef4444":isMed?"#f59e0b":"#22c55e"},
-      {icon:"📋",title:"Administrative Tasks",desc:"Handle routine tasks and communications. Avoid complex decision-making when possible.",timing:"Morning hours",strain:"LOW STRAIN",strainColor:"#22c55e"},
-      {icon:"🌙",title:"Recovery Evening Routine",desc:"Wind down with reading, gentle stretching, or meditation. Prepare for optimal sleep quality.",timing:"8:00 PM - 10:00 PM",strain:"LOW STRAIN",strainColor:"#22c55e"},
+      {icon:isCrisis?"🚑":"🌅",title:isCrisis?"Emergency Recovery":"Morning Power Routine",desc:isCrisis?"Critical biological fatigue. Rest immediately.":"Start with 10-15 min dynamic stretching, cold shower, and protein-rich breakfast.",timing:"7:00 AM",strain:isHigh?"MODERATE":"LOW",strainColor:isHigh?"#f59e0b":"#22c55e"},
+      {icon:"🏃",title:isHigh?"HIIT / Strength":isMed?"Brisk Walking":"Yoga / Mobility",desc:isHigh?"45-60 min intensive training. Push to 85% effort.":isMed?"30 min moderate movement. Keep HR in zone 2.":"Focus on light movement and structural alignment.",timing:"10:00 AM",strain:isHigh?"HIGH":isMed?"MODERATE":"LOW",strainColor:isHigh?"#ef4444":isMed?"#f59e0b":"#22c55e"},
+      {icon:"💊",title:"Bio-Optimization",desc:risk>50?"Prioritize anti-oxidant rich supplements.":"Focus on standard micronutrient profile.",timing:"12:00 PM",strain:"NONE",strainColor:"#4fc3f7"},
+      {icon:"🌙",title:"S21 Decompression",desc:isHigh?"Deep meditation and red light therapy.":"Standard wind-down routine.",timing:"9:00 PM",strain:"RECOVERY",strainColor:"#22c55e"},
     ];
   };
 
