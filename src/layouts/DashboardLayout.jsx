@@ -37,14 +37,14 @@ const DashboardLayout = () => {
         />
 
         <nav className="sidebar-nav">
-          <NavLink to="/dashboard/analysis" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <Activity size={20} />
-            <span>Clinical Analysis</span>
-          </NavLink>
-
           <NavLink to="/dashboard/simulations" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Binary size={20} />
             <span>Simulations</span>
+          </NavLink>
+
+          <NavLink to="/dashboard/analysis" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Activity size={20} />
+            <span>Clinical Analysis</span>
           </NavLink>
 
           <NavLink to="/dashboard/api" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

@@ -30,7 +30,7 @@ const PublicRoute = ({ children }) => {
   const token = localStorage.getItem("token");
 
   if (token) {
-    return <Navigate to="/dashboard/analysis" replace />;
+    return <Navigate to="/dashboard/simulations" replace />;
   }
 
   return children;
@@ -80,7 +80,7 @@ function App() {
           }
         >
           {/* 🔥 Default route */}
-          <Route index element={<Navigate to="/dashboard/analysis" replace />} />
+          <Route index element={<Navigate to="/dashboard/simulations" replace />} />
 
           {/* Main Pages */}
           <Route path="analysis" element={<ClinicalAnalysis />} />
