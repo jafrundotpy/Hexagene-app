@@ -1,13 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./AuthPage.css";
 import API_URL from "../api/config";
 
 const AuthPage = ({ mode = "login" }) => {
-  const isLogin = mode === "login";
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  // Internal state for toggling between Sign In and Sign Up views
+  const [isActive, setIsActive] = useState(mode === "signup");
+
+  // Keep internal state in sync if mode prop changes
+  useEffect(() => {
+    setIsActive(mode === "signup");
+    setError(""); // Clear any errors when switching modes
+  }, [mode]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -15,7 +23,8 @@ const AuthPage = ({ mode = "login" }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  // isSubmitLogin determines which form was submitted
+  const handleSubmit = async (e, isSubmitLogin) => {
     e.preventDefault();
     setError("");
 
@@ -24,7 +33,7 @@ const AuthPage = ({ mode = "login" }) => {
       return;
     }
 
-    if (!isLogin && !name.trim()) {
+    if (!isSubmitLogin && !name.trim()) {
       setError("Please enter your full name.");
       return;
     }
@@ -35,8 +44,8 @@ const AuthPage = ({ mode = "login" }) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const endpoint = isLogin ? "/auth/login" : "/auth/signup";
-      const payload = isLogin ? { email, password } : { name, email, password };
+      const endpoint = isSubmitLogin ? "/auth/login" : "/auth/signup";
+      const payload = isSubmitLogin ? { email, password } : { name, email, password };
 
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
@@ -48,7 +57,7 @@ const AuthPage = ({ mode = "login" }) => {
       clearTimeout(timeout);
       const data = await response.json();
 
-      if (isLogin) {
+      if (isSubmitLogin) {
         // Login-specific status code handling
         if (response.status === 401) {
           setError("Invalid email or password.");
@@ -71,7 +80,7 @@ const AuthPage = ({ mode = "login" }) => {
           return;
         }
       } else {
-        // Signup-specific status code handling (unchanged)
+        // Signup-specific status code handling
         if (response.status === 401) {
           setError("No account found with this email. Please sign up first.");
           return;
@@ -85,7 +94,7 @@ const AuthPage = ({ mode = "login" }) => {
         }
       }
 
-      if (isLogin) {
+      if (isSubmitLogin) {
         const token = data.access_token || data.token;
         localStorage.setItem("token", token);
         login({ name: data.user?.name || email.split("@")[0], email }, token);
@@ -116,6 +125,7 @@ const AuthPage = ({ mode = "login" }) => {
         navigate("/dashboard/simulations", { replace: true });
       } else {
         localStorage.setItem("pendingName", name);
+        // After signup, switch to login view
         navigate("/login");
       }
 
@@ -130,83 +140,124 @@ const AuthPage = ({ mode = "login" }) => {
     }
   };
 
+  const handleToggleLogin = () => {
+    navigate("/login");
+  };
+
+  const handleToggleSignup = () => {
+    navigate("/signup");
+  };
+
   return (
-    <div className="auth-background">
-      <div className="auth-container">
-        <div className="auth-glass-card">
-          <div className="auth-header">
-            <h2 className="auth-title">
-              {isLogin ? "Welcome Back" : "Create Account"}
-            </h2>
-            <p className="auth-subtitle">
-              {isLogin
-                ? "Enter your credentials to access your dashboard."
-                : "Join us to access premium analytics."}
-            </p>
-          </div>
-
-          {error && (
-            <div className="auth-error-banner">
-              <span className="error-icon">⚠️</span>
-              {error}
+    <div className="auth-page-wrapper">
+      <div className={`container ${isActive ? "active" : ""}`} id="container">
+        
+        {/* SIGN UP FORM */}
+        <div className="form-container sign-up">
+          <form onSubmit={(e) => handleSubmit(e, false)}>
+            <h1>Create Account</h1>
+            <div className="social-icons">
+              <a href="#" className="icon"><i className="fa-brands fa-google-plus-g"></i></a>
+              <a href="#" className="icon"><i className="fa-brands fa-facebook-f"></i></a>
+              <a href="#" className="icon"><i className="fa-brands fa-github"></i></a>
+              <a href="#" className="icon"><i className="fa-brands fa-linkedin-in"></i></a>
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="auth-form">
-            {!isLogin && (
-              <div className="form-group">
-                <label>Full Name</label>
-                <div className="input-wrapper">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    placeholder="John Doe"
-                    autoComplete="name"
-                  />
-                </div>
-              </div>
+            <span>or use your email for registeration</span>
+            {error && isActive && (
+              <div className="auth-error-banner">{error}</div>
             )}
-            <div className="form-group">
-              <label>Email Address</label>
-              <div className="input-wrapper">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="name@company.com"
-                  autoComplete="email"
-                />
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Password</label>
-              <div className="input-wrapper">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  autoComplete={isLogin ? "current-password" : "new-password"}
-                />
-              </div>
-            </div>
-
-            <button type="submit" className="auth-submit-btn" disabled={loading}>
-              {loading ? <span>Processing...</span> : isLogin ? "Sign In →" : "Get Started →"}
+            <input 
+              type="text" 
+              placeholder="Name" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required 
+            />
+            <input 
+              type="email" 
+              placeholder="Email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required 
+            />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
+            <button type="submit" disabled={loading}>
+              {loading ? "Processing..." : "Sign Up"}
             </button>
           </form>
+        </div>
 
-          <div className="auth-toggle">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <Link to={isLogin ? "/signup" : "/login"} className="auth-glow-link">
-              {isLogin ? "Sign Up" : "Log In"}
-            </Link>
+        {/* SIGN IN FORM */}
+        <div className="form-container sign-in">
+          <form onSubmit={(e) => handleSubmit(e, true)}>
+            <h1>Sign In</h1>
+            <div className="social-icons">
+              <a href="#" className="icon"><i className="fa-brands fa-google-plus-g"></i></a>
+              <a href="#" className="icon"><i className="fa-brands fa-facebook-f"></i></a>
+              <a href="#" className="icon"><i className="fa-brands fa-github"></i></a>
+              <a href="#" className="icon"><i className="fa-brands fa-linkedin-in"></i></a>
+            </div>
+            <span>or use your email password</span>
+            {error && !isActive && (
+              <div className="auth-error-banner">{error}</div>
+            )}
+            <input 
+              type="email" 
+              placeholder="Email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required 
+            />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+            />
+            <a href="#">Forget Your Password?</a>
+            <button type="submit" disabled={loading}>
+              {loading ? "Processing..." : "Sign In"}
+            </button>
+          </form>
+        </div>
+
+        {/* TOGGLE PANEL */}
+        <div className="toggle-container">
+          <div className="toggle">
+            <div className="toggle-panel toggle-left">
+              <h1>Welcome Back!</h1>
+              <p>Enter your personal details to use all of site features</p>
+              <button 
+                className="hidden" 
+                id="login" 
+                type="button" 
+                onClick={handleToggleLogin}
+              >
+                Sign In
+              </button>
+            </div>
+            <div className="toggle-panel toggle-right">
+              <h1>Hello, Friend!</h1>
+              <p>Register with your personal details to use all of site features</p>
+              <button 
+                className="hidden" 
+                id="register" 
+                type="button" 
+                onClick={handleToggleSignup}
+              >
+                Sign Up
+              </button>
+            </div>
           </div>
         </div>
+
       </div>
     </div>
   );
