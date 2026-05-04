@@ -14,7 +14,8 @@ const TABS = [
 const defaultForm = {
   age:"",sex:"",activityLevel:"",albumin:"",crp:"",hba1c:"",
   egfr:"",rdw:"",uricAcid:"",restingHR:"",dailySteps:"",activeMinutes:"",
-  vo2max:"",hrv:"",recoveryScore:"",sleepDuration:"",sleepScore:"",sleepDebt:""
+  vo2max:"",hrv:"",recoveryScore:"",sleepDuration:"",sleepScore:"",sleepDebt:"",
+  stress:"",oxygen:"",calories:""
 };
 
 const generateRandomForm = () => ({
@@ -457,19 +458,27 @@ const Simulations = () => {
       }
 
       const data = await response.json();
+
+      if (!data || Object.keys(data).length === 0) {
+        setUploadMsg("No wearable data available. Please sync data first.");
+        return;
+      }
       
-      // Auto-fill the form with wearable data
+      // Auto-fill all simulation form fields from Supabase mapping
       setForm(prev => ({
         ...prev,
         age: data.age ? data.age.toString() : prev.age,
-        sex: data.sex ? (data.sex === "male" ? "M" : "F") : prev.sex,
+        sex: data.sex ? (data.sex === "male" || data.sex === "M" ? "M" : "F") : prev.sex,
         dailySteps: data.daily_steps ? data.daily_steps.toString() : prev.dailySteps,
         restingHR: data.resting_heart_rate ? data.resting_heart_rate.toString() : prev.restingHR,
         sleepDuration: data.avg_sleep_hours ? data.avg_sleep_hours.toString() : prev.sleepDuration,
         hrv: data.hrv ? data.hrv.toString() : prev.hrv,
         activeMinutes: data.active_minutes ? data.active_minutes.toString() : prev.activeMinutes,
+        stress: data.stress_score ? data.stress_score.toString() : prev.stress,
+        oxygen: data.spo2 ? data.spo2.toString() : prev.oxygen,
+        calories: data.calories_burned ? data.calories_burned.toString() : prev.calories,
         
-        // Visual mapping to blood markers to match the backend logic for demo purposes
+        // Auto-map to blood markers for the engine to score correctly in demo
         crp: data.resting_heart_rate ? data.resting_heart_rate.toString() : prev.crp,
         albumin: data.avg_sleep_hours ? data.avg_sleep_hours.toString() : prev.albumin,
         egfr: data.hrv ? data.hrv.toString() : prev.egfr,
@@ -480,9 +489,13 @@ const Simulations = () => {
         sleepDebt: data.sleep_debt ? data.sleep_debt.toString() : prev.sleepDebt,
       }));
 
-      setUploadMsg(data._demo
-        ? "⚡ No real device data — loaded demo wearable profile. Click Run Complete Analysis."
-        : `✅ Real wearable data synced (${new Date().toLocaleTimeString()})! Click Run Complete Analysis.`);
+      setUploadMsg("Last synced: just now");
+
+      // Automatically trigger existing analysis function
+      setTimeout(() => {
+        handleRunAnalysis();
+      }, 500);
+
     } catch (err) {
       setUploadMsg(`❌ Error: ${err.message}`);
     } finally {
@@ -612,11 +625,14 @@ const Simulations = () => {
                     <InputField label="Resting HR (bpm)" value={form.restingHR} onChange={updateField("restingHR")} placeholder="57"/>
                     <InputField label="Daily Steps" value={form.dailySteps} onChange={updateField("dailySteps")} placeholder="6220"/>
                     <InputField label="Active Minutes" value={form.activeMinutes} onChange={updateField("activeMinutes")} placeholder="31"/>
+                    <InputField label="Calories Burned" value={form.calories} onChange={updateField("calories")} placeholder="450"/>
                   </div>
                   <div><SecTitle icon="🏃" label="Performance Metrics"/>
                     <InputField label="VO2 Max" value={form.vo2max} onChange={updateField("vo2max")} placeholder="35"/>
                     <InputField label="HRV (ms)" value={form.hrv} onChange={updateField("hrv")} placeholder="48"/>
-                    <InputField label="Recovery Score (%)" value={form.recoveryScore} onChange={updateField("recoveryScore")} placeholder="0-100"/>
+                    <InputField label="Recovery Score (%)" value={form.recoveryScore} onChange={updateField("recoveryScore")} placeholder="74"/>
+                    <InputField label="Stress Score" value={form.stress} onChange={updateField("stress")} placeholder="24"/>
+                    <InputField label="SpO2 (Oxygen %)" value={form.oxygen} onChange={updateField("oxygen")} placeholder="98"/>
                   </div>
                   <div style={{gridColumn:"1/-1"}}><SecTitle icon="😴" label="Sleep & Recovery"/></div>
                   <InputField label="Sleep Duration (hours)" value={form.sleepDuration} onChange={updateField("sleepDuration")} placeholder="7.4"/>

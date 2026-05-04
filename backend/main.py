@@ -313,13 +313,14 @@ _DEMO_WEARABLE = {
 
 def fetch_latest_wearable(user_id: str) -> dict:
     try:
-        res = supabase.table("wearable_metrics").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
+        # FOR DEMO: Always fetch the absolute latest row regardless of user_id
+        res = supabase.table("wearable_metrics").select("*").order("created_at", desc=True).limit(1).execute()
         if res.data:
             return res.data[0]
-    except Exception:
-        logger.warning("Supabase wearable fetch failed — using demo data")
+    except Exception as e:
+        logger.warning(f"Supabase wearable fetch failed: {e} — using demo data")
     # Fallback: return demo data so the Boss engine always has input to score
-    logger.info(f"No wearable data for user '{user_id}' — returning demo data")
+    logger.info(f"No wearable data found — returning demo data")
     return {**_DEMO_WEARABLE, "user_id": user_id}
 
 def wearable_to_patient_input(row: dict) -> dict:
