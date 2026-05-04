@@ -667,8 +667,8 @@ const Simulations = () => {
                   style={{border:`2px dashed ${dragOver?"#4fc3f7":"rgba(79,195,247,0.3)"}`,borderRadius:"12px",padding:"2rem",textAlign:"center",cursor:"pointer",background:dragOver?"rgba(79,195,247,0.05)":"transparent",transition:"all 0.2s"}}
                 >
                   <div style={{fontSize:"36px",marginBottom:"12px"}}>📸</div>
-                  <p style={{margin:"0 0 6px",fontWeight:"700",fontSize:"14px"}}>Upload QRing Screenshot</p>
-                  <p style={{margin:0,color:"#64748b",fontSize:"12px"}}>Take a screenshot of your QRing dashboard and upload it here</p>
+                  <p style={{margin:"0 0 6px",fontWeight:"700",fontSize:"14px"}}>Upload QRing Results (JPG, JPEG, PNG)</p>
+                  <p style={{margin:0,color:"#64748b",fontSize:"12px"}}>Save image file from your QRing app and upload here</p>
                   <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFileUpload(e.target.files[0])}/>
                 </div>
                 {uploadMsg&&(
