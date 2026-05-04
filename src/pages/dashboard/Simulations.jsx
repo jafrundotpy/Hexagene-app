@@ -19,8 +19,8 @@ const defaultForm = {
 };
 
 const generateRandomForm = () => ({
-  age: Math.floor(Math.random()*50+20).toString(),
-  sex: Math.random()>0.5?"M":"F",
+  age: "", // Mandatory manual entry
+  sex: "", // Mandatory manual entry
   activityLevel: Math.floor(Math.random()*5+1).toString(),
   albumin: (Math.random()*1.5+3.0).toFixed(1),
   crp: (Math.random()*4.9+0.1).toFixed(1),
@@ -356,6 +356,11 @@ const Simulations = () => {
   const updateField = (key) => (val) => setForm(f=>({...f,[key]:val}));
 
   const handleRunAnalysis = async () => {
+    if (!form.age || !form.sex) {
+      setUploadMsg("⚠️ Please enter your age and sex to continue.");
+      return;
+    }
+
     try {
       setUploading(true);
       setUploadMsg("Analyzing health data...");
@@ -372,8 +377,8 @@ const Simulations = () => {
 
       const payload = {
         user_id: userId,
-        age: parseInt(form.age) || 29,
-        sex: form.sex || "M",
+        age: parseInt(form.age),
+        sex: form.sex,
         daily_steps: parseFloat(form.dailySteps) || 0,
         resting_heart_rate: parseFloat(form.restingHR) || 0,
         avg_sleep_hours: parseFloat(form.sleepDuration) || 0,
@@ -481,8 +486,7 @@ const Simulations = () => {
       // Auto-fill all simulation form fields from Supabase mapping
       setForm(prev => ({
         ...prev,
-        age: data.age ? data.age.toString() : prev.age,
-        sex: data.sex ? (data.sex === "male" || data.sex === "M" ? "M" : "F") : prev.sex,
+        // Age and Sex must be entered manually now
         dailySteps: data.daily_steps ? data.daily_steps.toString() : prev.dailySteps,
         restingHR: data.resting_heart_rate ? data.resting_heart_rate.toString() : prev.restingHR,
         sleepDuration: data.avg_sleep_hours ? data.avg_sleep_hours.toString() : prev.sleepDuration,
@@ -546,8 +550,7 @@ const Simulations = () => {
         oxygen: data.spo2 !== undefined ? data.spo2.toString() : prev.oxygen,
         calories: data.calories_burned !== undefined ? data.calories_burned.toString() : prev.calories,
         activeMinutes: data.active_minutes !== undefined ? data.active_minutes.toString() : prev.activeMinutes,
-        age: data.age !== undefined ? data.age.toString() : prev.age,
-        sex: data.sex !== undefined ? (data.sex === 1 || data.sex === "M" ? "M" : "F") : prev.sex,
+        // Age and Sex must be entered manually now
         
         // Also map to core panel for simulation purposes
         crp: data.resting_heart_rate !== undefined ? data.resting_heart_rate.toString() : prev.crp,
@@ -669,7 +672,16 @@ const Simulations = () => {
                   <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFileUpload(e.target.files[0])}/>
                 </div>
                 {uploadMsg&&(
-                  <div style={{marginTop:"12px",padding:"10px 14px",borderRadius:"8px",background:uploading?"rgba(79,195,247,0.08)":"rgba(34,197,94,0.08)",border:`1px solid ${uploading?"rgba(79,195,247,0.2)":"rgba(34,197,94,0.2)"}`,fontSize:"13px",color:uploading?"#4fc3f7":"#22c55e"}}>
+                  <div style={{
+                    marginTop:"12px",
+                    padding:"10px 14px",
+                    borderRadius:"8px",
+                    background: uploadMsg.includes("⚠️") ? "rgba(245,158,11,0.1)" : uploading ? "rgba(79,195,247,0.08)" : "rgba(34,197,94,0.08)",
+                    border: `1px solid ${uploadMsg.includes("⚠️") ? "rgba(245,158,11,0.3)" : uploading ? "rgba(79,195,247,0.2)" : "rgba(34,197,94,0.2)"}`,
+                    fontSize: "13px",
+                    color: uploadMsg.includes("⚠️") ? "#f59e0b" : uploading ? "#4fc3f7" : "#22c55e",
+                    fontWeight: uploadMsg.includes("⚠️") ? "700" : "400"
+                  }}>
                     {uploadMsg}
                   </div>
                 )}
