@@ -113,7 +113,7 @@ const AuthPage = ({ mode = "login" }) => {
           }
         }
 
-        navigate("/dashboard/analysis", { replace: true });
+        navigate("/dashboard/simulations", { replace: true });
       } else {
         localStorage.setItem("pendingName", name);
         navigate("/login");
