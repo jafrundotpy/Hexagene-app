@@ -254,6 +254,14 @@ class AnalysisRequest(BaseModel):
 
 class WearableScoreRequest(BaseModel):
     user_id: str
+    daily_steps: Optional[float] = None
+    resting_heart_rate: Optional[float] = None
+    avg_sleep_hours: Optional[float] = None
+    hrv: Optional[float] = None
+    stress_score: Optional[float] = None
+    spo2: Optional[float] = None
+    calories_burned: Optional[float] = None
+    active_minutes: Optional[float] = None
 
 class WearableIngestRequest(BaseModel):
     user_id: Optional[str] = None
@@ -597,7 +605,19 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
     if not _READY["ok"]:
         raise HTTPException(status_code=503, detail="engine not ready")
         
-    row = fetch_latest_wearable(request.user_id)
+    # Fetch latest from DB as baseline
+    row = fetch_latest_wearable(request.user_id) or {}
+    
+    # Overwrite DB data with payload data if provided (Simulation Mode)
+    if request.daily_steps is not None: row["daily_steps"] = request.daily_steps
+    if request.resting_heart_rate is not None: row["resting_heart_rate"] = request.resting_heart_rate
+    if request.avg_sleep_hours is not None: row["avg_sleep_hours"] = request.avg_sleep_hours
+    if request.hrv is not None: row["hrv"] = request.hrv
+    if request.stress_score is not None: row["stress_score"] = request.stress_score
+    if request.spo2 is not None: row["spo2"] = request.spo2
+    if request.calories_burned is not None: row["calories_burned"] = request.calories_burned
+    if request.active_minutes is not None: row["active_minutes"] = request.active_minutes
+
     patient_data = wearable_to_patient_input(row)
     
     try:
