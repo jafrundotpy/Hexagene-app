@@ -85,6 +85,7 @@
 
 .auth-page-wrapper .container input {
     background-color: #eee;
+    color: #333;
     border: none;
     margin: 8px 0;
     padding: 10px 15px;
@@ -92,6 +93,19 @@
     border-radius: 8px;
     width: 100%;
     outline: none;
+}
+
+/* Hide mobile toggle links by default on desktop */
+.mobile-toggle-link {
+    display: none;
+    font-size: 12px;
+    margin-top: 15px;
+}
+.mobile-toggle-link span {
+    color: #512da8;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
 }
 
 .auth-page-wrapper .form-container {
@@ -228,4 +242,56 @@
     width: 100%;
     text-align: center;
     border: 1px solid #ffcdd2;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .auth-page-wrapper .container {
+        width: 90%;
+        min-height: 500px;
+        border-radius: 15px;
+    }
+    
+    .auth-page-wrapper .toggle-container {
+        display: none; /* Hide the sliding panels on mobile */
+    }
+    
+    .auth-page-wrapper .form-container {
+        width: 100%; /* Forms take full width */
+        transition: none; /* Remove sliding animation */
+    }
+    
+    /* Toggle visibility purely via z-index and opacity on mobile */
+    .auth-page-wrapper .sign-in {
+        z-index: 5;
+        opacity: 1;
+        transform: translateX(0);
+    }
+    
+    .auth-page-wrapper .sign-up {
+        z-index: 1;
+        opacity: 0;
+        transform: translateX(0);
+        pointer-events: none;
+    }
+    
+    .auth-page-wrapper .container.active .sign-in {
+        z-index: 1;
+        opacity: 0;
+        transform: translateX(0);
+        pointer-events: none;
+    }
+    
+    .auth-page-wrapper .container.active .sign-up {
+        z-index: 5;
+        opacity: 1;
+        transform: translateX(0);
+        pointer-events: auto;
+        animation: none;
+    }
+
+    /* Show mobile toggle links on small screens */
+    .mobile-toggle-link {
+        display: block;
+    }
 }

@@ -190,6 +190,9 @@ const AuthPage = ({ mode = "login" }) => {
             <button type="submit" disabled={loading}>
               {loading ? "Processing..." : "Sign Up"}
             </button>
+            <p className="mobile-toggle-link">
+              Already have an account? <span onClick={handleToggleLogin}>Sign In</span>
+            </p>
           </form>
         </div>
 
@@ -225,6 +228,9 @@ const AuthPage = ({ mode = "login" }) => {
             <button type="submit" disabled={loading}>
               {loading ? "Processing..." : "Sign In"}
             </button>
+            <p className="mobile-toggle-link">
+              Don't have an account? <span onClick={handleToggleSignup}>Sign Up</span>
+            </p>
           </form>
         </div>
 
