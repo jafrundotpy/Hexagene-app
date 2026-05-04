@@ -190,9 +190,9 @@ app.add_middleware(
 
 security = HTTPBearer(auto_error=False)
 
-_RATE_LIMIT   = 20   # max requests per window
+_RATE_LIMIT   = 500  # Increased for demo (100+ concurrent users)
 _RATE_WINDOW  = 60   # seconds
-_BURST_LIMIT  = 3    # max requests per burst window
+_BURST_LIMIT  = 50   # Increased for demo
 _BURST_WINDOW = 2    # seconds
 
 class _RateLimiter:
