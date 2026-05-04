@@ -13,13 +13,19 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any, Union, Optional
 
+import base64
+import httpx
+import json
+import re
 from fastapi import (
     FastAPI,
     HTTPException,
     Depends,
     Header,
     Request,
-    status
+    status,
+    File,
+    UploadFile
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -604,6 +610,122 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
         
     _increment_usage(key_data)
     return report
+
+@app.post("/api/ocr-wearable", tags=["ocr"])
+async def ocr_wearable(file: UploadFile = File(...)):
+    """
+    Analyzes a QRing health dashboard screenshot using OpenRouter (Gemini 2.0 Flash).
+    Extracts metrics and returns them as JSON.
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        logger.error("OPENROUTER_API_KEY missing from environment")
+        raise HTTPException(status_code=500, detail="OCR service misconfigured (missing API key)")
+
+    try:
+        # 1. Read and encode image
+        contents = await file.read()
+        base64_image = base64.b64encode(contents).decode('utf-8')
+        
+        # 2. Prepare OpenRouter request
+        prompt = (
+            "Analyze the attached QRing health dashboard screenshot carefully.\n\n"
+            "This screenshot contains multiple cards such as:\n"
+            "Activity, Sleep, Heart Rate, Sport Record, Blood Oxygen, Stress, Blood Pressure.\n\n"
+            "Read ONLY clearly visible numbers from the image.\n\n"
+            "Extraction rules:\n\n"
+            "1. Activity card:\n"
+            "- daily_steps = steps value\n"
+            "- calories_burned = Kcal value\n"
+            "- active_minutes = if missing use 0\n\n"
+            "2. Heart Rate card:\n"
+            "- resting_heart_rate = bpm value shown at bottom left\n\n"
+            "3. Blood Oxygen card:\n"
+            "- spo2 = percentage shown at bottom left\n\n"
+            "4. Stress card:\n"
+            "- stress_score = main large number in center\n\n"
+            "5. Sleep card:\n"
+            "- avg_sleep_hours = if sleep duration shown convert to hours\n"
+            "- if no sleep data visible use 7\n\n"
+            "6. HRV:\n"
+            "- If not visible use 50\n\n"
+            "7. Age:\n"
+            "- use 29 if not given\n\n"
+            "8. Sex:\n"
+            "- use 1 if not given\n\n"
+            "Return ONLY valid JSON in this exact format:\n\n"
+            "{\n"
+            "  \"daily_steps\": 0,\n"
+            "  \"resting_heart_rate\": 70,\n"
+            "  \"spo2\": 98,\n"
+            "  \"stress_score\": 30,\n"
+            "  \"avg_sleep_hours\": 7,\n"
+            "  \"hrv\": 50,\n"
+            "  \"calories_burned\": 0,\n"
+            "  \"active_minutes\": 0,\n"
+            "  \"age\": 29,\n"
+            "  \"sex\": 1\n"
+            "}\n\n"
+            "No markdown.\n"
+            "No explanation.\n"
+            "No extra text."
+        )
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": "google/gemini-2.0-flash-001",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{file.content_type};base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+
+        # 3. Call OpenRouter
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=502, detail="OCR service returned an error")
+
+            result = response.json()
+            content = result['choices'][0]['message']['content']
+            
+            # 4. Extract and parse JSON
+            # Remove markdown code blocks if present
+            clean_content = re.sub(r'```json\s*|\s*```', '', content).strip()
+            
+            try:
+                extracted_data = json.loads(clean_content)
+                logger.info(f"Successfully extracted OCR data: {extracted_data}")
+                return extracted_data
+            except json.JSONDecodeError as je:
+                logger.error(f"Failed to parse OCR JSON: {clean_content}")
+                raise HTTPException(status_code=500, detail="Failed to parse health data from screenshot")
+
+    except Exception as e:
+        logger.exception("OCR processing failed")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
 # WEARABLE INGEST — for n8n / Apple Health / QRing

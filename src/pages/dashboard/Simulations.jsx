@@ -503,9 +503,63 @@ const Simulations = () => {
     }
   };
 
-  const handleFileUpload = (file) => {
-    // OCR feature is temporarily disabled
-    setUploadMsg("🚧 Screenshot OCR feature is under development. Please enter data manually.");
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    
+    try {
+      setUploading(true);
+      setUploadMsg("Analyzing screenshot...");
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const response = await fetch(`${API_BASE}/api/ocr-wearable`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Unable to read screenshot. Please try another image.");
+      }
+      
+      const data = await response.json();
+      console.log("OCR Data Received:", data);
+      
+      // Auto-fill form with extracted metrics
+      setForm(prev => ({
+        ...prev,
+        dailySteps: data.daily_steps !== undefined ? data.daily_steps.toString() : prev.dailySteps,
+        restingHR: data.resting_heart_rate !== undefined ? data.resting_heart_rate.toString() : prev.restingHR,
+        sleepDuration: data.avg_sleep_hours !== undefined ? data.avg_sleep_hours.toString() : prev.sleepDuration,
+        hrv: data.hrv !== undefined ? data.hrv.toString() : prev.hrv,
+        stress: data.stress_score !== undefined ? data.stress_score.toString() : prev.stress,
+        oxygen: data.spo2 !== undefined ? data.spo2.toString() : prev.oxygen,
+        calories: data.calories_burned !== undefined ? data.calories_burned.toString() : prev.calories,
+        activeMinutes: data.active_minutes !== undefined ? data.active_minutes.toString() : prev.activeMinutes,
+        age: data.age !== undefined ? data.age.toString() : prev.age,
+        sex: data.sex !== undefined ? (data.sex === 1 || data.sex === "M" ? "M" : "F") : prev.sex,
+        
+        // Also map to core panel for simulation purposes
+        crp: data.resting_heart_rate !== undefined ? data.resting_heart_rate.toString() : prev.crp,
+        albumin: data.avg_sleep_hours !== undefined ? data.avg_sleep_hours.toString() : prev.albumin,
+        egfr: data.hrv !== undefined ? data.hrv.toString() : prev.egfr,
+        hba1c: data.active_minutes !== undefined ? data.active_minutes.toString() : prev.hba1c,
+      }));
+      
+      setUploadMsg("✅ Screenshot analyzed successfully! Results updated.");
+      
+      // Automatically trigger analysis
+      setTimeout(() => {
+        handleRunAnalysis();
+      }, 500);
+      
+    } catch (err) {
+      console.error("OCR Error:", err);
+      setUploadMsg(`❌ OCR Error: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const tabStyle = (id) => ({
@@ -594,9 +648,9 @@ const Simulations = () => {
                   onClick={()=>fileRef.current.click()}
                   style={{border:`2px dashed ${dragOver?"#4fc3f7":"rgba(79,195,247,0.3)"}`,borderRadius:"12px",padding:"2rem",textAlign:"center",cursor:"pointer",background:dragOver?"rgba(79,195,247,0.05)":"transparent",transition:"all 0.2s"}}
                 >
-                  <div style={{fontSize:"36px",marginBottom:"12px"}}>📱</div>
-                  <p style={{margin:"0 0 6px",fontWeight:"700",fontSize:"14px"}}>Upload Wearable App Screenshots</p>
-                  <p style={{margin:0,color:"#64748b",fontSize:"12px"}}>Apple Health, Fitbit, Garmin, Samsung Health, Whoop, Oura, or any wearable data</p>
+                  <div style={{fontSize:"36px",marginBottom:"12px"}}>📸</div>
+                  <p style={{margin:"0 0 6px",fontWeight:"700",fontSize:"14px"}}>Upload QRing Screenshot</p>
+                  <p style={{margin:0,color:"#64748b",fontSize:"12px"}}>Take a screenshot of your QRing dashboard and upload it here</p>
                   <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFileUpload(e.target.files[0])}/>
                 </div>
                 {uploadMsg&&(
