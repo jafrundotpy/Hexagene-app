@@ -254,6 +254,8 @@ class AnalysisRequest(BaseModel):
 
 class WearableScoreRequest(BaseModel):
     user_id: str
+    age: Optional[int] = None
+    sex: Optional[str] = None
     daily_steps: Optional[float] = None
     resting_heart_rate: Optional[float] = None
     avg_sleep_hours: Optional[float] = None
@@ -607,8 +609,11 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
         
     # Fetch latest from DB as baseline
     row = fetch_latest_wearable(request.user_id) or {}
+    logger.info(f"Analysis request for {request.user_id}. Baseline row: {list(row.keys())}")
     
     # Overwrite DB data with payload data if provided (Simulation Mode)
+    if request.age is not None: row["age"] = request.age
+    if request.sex is not None: row["sex"] = request.sex
     if request.daily_steps is not None: row["daily_steps"] = request.daily_steps
     if request.resting_heart_rate is not None: row["resting_heart_rate"] = request.resting_heart_rate
     if request.avg_sleep_hours is not None: row["avg_sleep_hours"] = request.avg_sleep_hours
@@ -619,6 +624,7 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
     if request.active_minutes is not None: row["active_minutes"] = request.active_minutes
 
     patient_data = wearable_to_patient_input(row)
+    logger.info(f"Engine Input (patient_data): {patient_data}")
     
     try:
         report = patient_report(patient_data)

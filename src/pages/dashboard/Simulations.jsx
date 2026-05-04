@@ -372,6 +372,8 @@ const Simulations = () => {
 
       const payload = {
         user_id: userId,
+        age: parseInt(form.age) || 29,
+        sex: form.sex || "M",
         daily_steps: parseFloat(form.dailySteps) || 0,
         resting_heart_rate: parseFloat(form.restingHR) || 0,
         avg_sleep_hours: parseFloat(form.sleepDuration) || 0,
