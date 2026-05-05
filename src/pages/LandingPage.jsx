@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
+import API_URL from '../api/config';
 
 const LandingPage = () => {
   const navigate = useNavigate();
