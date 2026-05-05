@@ -240,7 +240,7 @@ const ApiAccess = () => {
                   <p><span className="text-health-primary">curl</span> -X POST "https://api.exagin.com/v2/score" \</p>
                   <p className="pl-4">-H <span className="text-orange-400">"x-api-key: YOUR_KEY"</span> \</p>
                   <p className="pl-4">-H <span className="text-orange-400">"Content-Type: application/json"</span> \</p>
-                  <p className="pl-4">-d <span className="text-emerald-400">'{ "biomarkers": { "crp": 1.2 } }'</span></p>
+                  <p className="pl-4">-d <span className="text-emerald-400">{`'{ "biomarkers": { "crp": 1.2 } }'`}</span></p>
                 </div>
               </div>
             </div>
