@@ -201,14 +201,14 @@ const ApiAccess = () => {
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
                               <code className="text-xs font-mono font-bold bg-health-surface px-2 py-1 rounded text-health-text">
-                                {showKeyId === key.id ? key.key : `${key.key.substring(0, 12)}••••••••••••`}
+                                {showKeyId === (key.id || key.api_key) ? key.api_key : `${key.api_key?.substring(0, 12) || ""}••••••••••••`}
                               </code>
                               <button 
-                                onClick={() => toggleKeyVisibility(key.id)}
+                                onClick={() => toggleKeyVisibility(key.id || key.api_key)}
                                 className="p-1.5 hover:bg-health-surface rounded transition-colors text-health-muted"
                                 title="Toggle Visibility"
                               >
-                                {showKeyId === key.id ? <EyeOff size={14} /> : <Eye size={14} />}
+                                {showKeyId === (key.id || key.api_key) ? <EyeOff size={14} /> : <Eye size={14} />}
                               </button>
                             </div>
                             <p className="text-[10px] text-health-muted font-medium ml-1">SHA-256 Protocol Activated</p>
@@ -220,17 +220,17 @@ const ApiAccess = () => {
                           </span>
                         </td>
                         <td className="p-4 text-xs font-medium text-health-muted italic">
-                          {new Date(key.created_at).toLocaleDateString()}
+                          {key.created_at ? new Date(key.created_at).toLocaleDateString() : "N/A"}
                         </td>
                         <td className="p-4 text-right space-x-2">
                           <button 
-                            onClick={() => copyToClipboard(key.key, key.id)}
+                            onClick={() => copyToClipboard(key.api_key, key.id || key.api_key)}
                             className="btn-health-outline py-2 px-3 text-[10px] uppercase"
                           >
-                            {copyStatus === key.id ? "Copied" : <><Copy size={12} className="inline mr-1" /> Copy</>}
+                            {copyStatus === (key.id || key.api_key) ? "Copied" : <><Copy size={12} className="inline mr-1" /> Copy</>}
                           </button>
                           <button 
-                            onClick={() => deleteKey(key.id)}
+                            onClick={() => deleteKey(key.id || key.api_key)}
                             className="py-2 px-3 text-[10px] uppercase font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
                           >
                             Revoke
