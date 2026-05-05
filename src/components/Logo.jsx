@@ -8,26 +8,25 @@ const Logo = ({ size = 32, showText = true, className = "", onClick }) => {
       style={{ cursor: onClick ? 'pointer' : 'default' }}
     >
       <div className="relative">
-        <svg 
-          width={size} 
-          height={size} 
-          viewBox="0 0 32 32" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <rect width="32" height="32" rx="10" fill="#22C55E" />
-          <path 
-            d="M16 8V24M8 16H24" 
-            stroke="white" 
-            strokeWidth="3.5" 
-            strokeLinecap="round" 
-          />
-        </svg>
+        <div 
+          className="rounded-[20%] overflow-hidden shadow-sm"
+          style={{ 
+            width: size, 
+            height: size,
+            background: 'linear-gradient(135deg, #0ea5e9 0%, #22d3ee 100%)' 
+          }}
+        />
       </div>
       
       {showText && (
-        <span className="text-xl font-heading font-bold tracking-tight text-health-text">
-          Exa<span className="text-health-primary">gin</span>
+        <span 
+          className="text-2xl font-bold tracking-tight"
+          style={{ 
+            fontFamily: '"Times New Roman", Times, serif',
+            color: '#1e40af' // Deep blue matching the logo text
+          }}
+        >
+          HexaGene
         </span>
       )}
     </div>

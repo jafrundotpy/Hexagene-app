@@ -90,7 +90,7 @@ export default function IntegrationDocs() {
           </div>
           <h1 className="text-4xl font-heading font-black text-health-text">API <span className="text-health-primary">Integration</span></h1>
           <p className="text-health-muted max-w-2xl leading-relaxed">
-            Clinical specifications for connecting your infrastructure to the Exagin S21 diagnostic engine.
+            Clinical specifications for connecting your infrastructure to the HexaGene S21 diagnostic engine.
           </p>
         </div>
         
@@ -252,7 +252,7 @@ export default function IntegrationDocs() {
               <span className="text-[10px] font-black uppercase tracking-widest">Medical Support</span>
             </div>
             <p className="text-xs text-orange-800 leading-relaxed italic font-medium">
-              "For laboratory-specific endpoint configuration, contact our team at <span className="font-bold underline">support@exagin.com</span>"
+              "For laboratory-specific endpoint configuration, contact our team at <span className="font-bold underline">support@hexagene.com</span>"
             </p>
           </div>
         </div>

@@ -18,8 +18,11 @@ import {
   Search
 } from 'lucide-react';
 
+import ErrorBanner from '../components/UI/ErrorBanner';
+
 const DashboardLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [globalError, setGlobalError] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -39,6 +42,8 @@ const DashboardLayout = () => {
 
   return (
     <div className="min-h-screen bg-health-bg flex">
+      <ErrorBanner message={globalError} onClose={() => setGlobalError(null)} />
+      
       {/* SIDEBAR - DESKTOP */}
       <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-health-border sticky top-0 h-screen">
         <div className="p-8">

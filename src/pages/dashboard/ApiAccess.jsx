@@ -20,7 +20,8 @@ import {
   Info,
   ExternalLink,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  ArrowUpRight
 } from "lucide-react";
 
 const ApiAccess = () => {
@@ -31,6 +32,7 @@ const ApiAccess = () => {
   const [showKeyId, setShowKeyId] = useState(null);
   const [copyStatus, setCopyStatus] = useState(null);
   const [error, setError] = useState(null);
+  const [newKey, setNewKey] = useState(null);
 
   useEffect(() => {
     fetchKeys();
@@ -44,7 +46,7 @@ const ApiAccess = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        setKeys(data);
+        setKeys(data.keys || []);
       }
     } catch (err) {
       setError("Failed to fetch keys");
@@ -56,16 +58,18 @@ const ApiAccess = () => {
   const generateKey = async () => {
     setGenerating(true);
     setError(null);
+    setNewKey(null);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/generate-key`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       });
+      const data = await res.json();
       if (res.ok) {
+        setNewKey(data.api_key);
         await fetchKeys();
       } else {
-        const data = await res.json();
         setError(data.detail || "Generation failed");
       }
     } catch (err) {
@@ -76,20 +80,9 @@ const ApiAccess = () => {
   };
 
   const deleteKey = async (id) => {
-    if (!window.confirm("Are you sure you want to revoke this API key? Connections using this key will fail immediately.")) return;
-    
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/keys/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setKeys(keys.filter(k => k.id !== id));
-      }
-    } catch (err) {
-      setError("Failed to revoke key");
-    }
+    // Note: Backend currently doesn't support individual key deletion via DELETE /api/keys/${id}
+    // and regenerate-key deletes all old keys. We'll show a message or disable this.
+    alert("Individual key revocation is currently handled by generating a new key, which rotates all credentials for security.");
   };
 
   const copyToClipboard = (text, id) => {
@@ -114,7 +107,7 @@ const ApiAccess = () => {
           </div>
           <h1 className="text-4xl font-heading font-black text-health-text">API <span className="text-health-primary">Access</span></h1>
           <p className="text-health-muted max-w-2xl leading-relaxed">
-            Manage your secure access credentials for the Exagin S21 engine. 
+            Manage your secure access credentials for the HexaGene S21 engine. 
             Keep your API keys private and never expose them in client-side code.
           </p>
         </div>
@@ -128,6 +121,42 @@ const ApiAccess = () => {
           <span>Generate New API Key</span>
         </button>
       </div>
+
+      {newKey && (
+        <div className="p-8 bg-health-primary/5 border-2 border-health-primary/20 rounded-3xl space-y-6 animate-fade-in relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Shield size={120} />
+          </div>
+          
+          <div className="flex items-center gap-3 text-health-primary">
+            <CheckCircle size={24} />
+            <h3 className="text-xl font-bold">New API Key Generated Successfully</h3>
+          </div>
+          
+          <p className="text-health-muted text-sm max-w-2xl leading-relaxed">
+            For security reasons, we only show this raw key <span className="font-bold text-health-text">once</span>. 
+            Please copy it now and store it in a secure location (like a password manager). 
+            You cannot retrieve this raw key again.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-full bg-white border border-health-primary/30 p-4 rounded-xl font-mono text-lg font-bold text-health-text break-all shadow-inner">
+              {newKey}
+            </div>
+            <button 
+              onClick={() => copyToClipboard(newKey, 'new-key')}
+              className="btn-health-primary px-8 py-4 whitespace-nowrap"
+            >
+              {copyStatus === 'new-key' ? "Copied!" : <><Copy size={18} /> Copy Key</>}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-bold text-orange-600 bg-orange-50 px-4 py-2 rounded-lg inline-flex">
+            <AlertTriangle size={14} />
+            Important: All previous keys have been revoked for your security.
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm animate-fade-in">
@@ -237,7 +266,7 @@ const ApiAccess = () => {
                   <button className="text-white/40 hover:text-white"><Copy size={16} /></button>
                 </div>
                 <div className="text-white/90 space-y-1">
-                  <p><span className="text-health-primary">curl</span> -X POST "https://api.exagin.com/v2/score" \</p>
+                  <p><span className="text-health-primary">curl</span> -X POST "https://api.hexagene.com/v2/score" \</p>
                   <p className="pl-4">-H <span className="text-orange-400">"x-api-key: YOUR_KEY"</span> \</p>
                   <p className="pl-4">-H <span className="text-orange-400">"Content-Type: application/json"</span> \</p>
                   <p className="pl-4">-d <span className="text-emerald-400">{`'{ "biomarkers": { "crp": 1.2 } }'`}</span></p>

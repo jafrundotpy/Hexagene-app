@@ -70,7 +70,7 @@ const LandingPage = () => {
           </h1>
           
           <p className="text-lg md:text-xl text-health-muted max-w-2xl mx-auto leading-relaxed">
-            Deterministic clinical intelligence powered by S21 physics theory. 
+            Deterministic clinical intelligence powered by HexaGene S21 physics theory. 
             Convert biomarkers into multi-axis risk scoring with production-ready APIs.
           </p>
 
@@ -188,7 +188,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <Logo size={28} />
           <div className="text-[10px] font-bold text-health-muted uppercase tracking-[0.2em]">
-            © 2026 Exagin Systems. All rights reserved.
+            © 2026 HexaGene Systems. All rights reserved.
           </div>
           <div className="flex gap-6">
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Privacy</a>

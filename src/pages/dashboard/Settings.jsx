@@ -193,7 +193,7 @@ const Settings = () => {
                   <div className="space-y-2">
                     <h3 className="text-xl font-black text-red-500">Danger Zone</h3>
                     <p className="text-xs text-health-muted font-medium leading-relaxed">
-                      Permanently terminate your Exagin account and purge all associated biological markers and laboratory data from our systems. <strong>This action cannot be undone.</strong>
+                      Permanently terminate your HexaGene account and purge all associated biological markers and laboratory data from our systems. <strong>This action cannot be undone.</strong>
                     </p>
                   </div>
                   <button className="flex items-center gap-2 px-8 py-4 rounded-2xl bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-all text-xs font-black uppercase tracking-widest">

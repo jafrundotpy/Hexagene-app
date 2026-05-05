@@ -43,8 +43,16 @@ const Usage = () => {
         
         if (res.ok) {
           const data = await res.json();
-          setMetrics(data.summary);
-          setLogs(data.recent_logs);
+          // Backend returns flat metrics, not data.summary
+          setMetrics({
+            total_calls: data.total_requests,
+            analysis_count: data.blood_requests,
+            avg_latency: data.avg_compute_time?.replace(" ms", ""),
+            success_rate: data.success_rate,
+            errors_today: data.errors_today
+          });
+          // Backend fetches but doesn't return logs, so we'll show empty or fallback
+          setLogs(data.recent_logs || []);
         }
       } catch (err) {
         console.error(err);
@@ -110,7 +118,7 @@ const Usage = () => {
         />
         <MetricCard 
           title="Success Rate" 
-          value="99.94%" 
+          value={metrics?.success_rate || "100%"} 
           icon={<ShieldCheck />} 
           color="orange"
           trend="neutral"
