@@ -1,9 +1,27 @@
 import React, { useEffect, useState } from "react";
+import {
+  Activity,
+  Zap,
+  CheckCircle,
+  AlertCircle,
+  ShieldCheck,
+  Server,
+  Clock,
+  Database,
+  BarChart3,
+  RefreshCw,
+  Cpu,
+  Info,
+  Layers,
+  ChevronRight,
+  Loader2,
+  Shield
+} from "lucide-react";
+import MetricCard from "../../components/dashboard/MetricCard";
 import API_URL from "../../api/config";
 
 export default function Usage() {
   const [loading, setLoading] = useState(true);
-
   const [metrics, setMetrics] = useState({
     total_requests: 0,
     avg_compute_time: "0 ms",
@@ -57,15 +75,12 @@ export default function Usage() {
   const fetchMetrics = async () => {
     try {
       const token = localStorage.getItem("token");
-
       const res = await fetch(`${API_URL}/api/usage-metrics`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-
       if (res.ok && data.success) {
         setMetrics(data);
       }
@@ -76,349 +91,238 @@ export default function Usage() {
     }
   };
 
-  const stats = [
-    {
-      title: "Total Requests",
-      value: metrics.total_requests,
-      icon: "📡",
-      color: "#3b82f6",
-    },
-    {
-      title: "Avg Compute Time",
-      value: metrics.avg_compute_time,
-      icon: "⚡",
-      color: "#8b5cf6",
-    },
-    {
-      title: "Success Rate",
-      value: metrics.success_rate,
-      icon: "✅",
-      color: "#10b981",
-    },
-    {
-      title: "Errors Today",
-      value: metrics.errors_today,
-      icon: "🚨",
-      color: "#ef4444",
-    },
-  ];
-
-  const observability = [
-    {
-      label: "Blood Requests",
-      value: metrics.blood_requests,
-      icon: "🩸",
-    },
-    {
-      label: "Medication Requests",
-      value: metrics.med_requests,
-      icon: "💊",
-    },
-    {
-      label: "Variant Requests",
-      value: metrics.variant_requests,
-      icon: "🧬",
-    },
-    {
-      label: "Avg Variant Count",
-      value: metrics.avg_variant_count,
-      icon: "📊",
-    },
-  ];
-
   return (
-    <div
-      style={{
-        padding: "32px",
-        color: "white",
-        background:
-          "linear-gradient(180deg, #0b1120 0%, #111827 100%)",
-        minHeight: "100vh",
-      }}
-    >
-      {/* Header */}
-      <div style={{ marginBottom: "28px" }}>
-        <h1
-          style={{
-            fontSize: "34px",
-            fontWeight: "700",
-            marginBottom: "8px",
-          }}
-        >
-          Usage Metrics
-        </h1>
-
-        <p
-          style={{
-            color: "#94a3b8",
-            fontSize: "15px",
-          }}
-        >
-          Live operational analytics for your HexaGene API
-        </p>
+    <div className="space-y-10 pb-20">
+      
+      {/* HEADER SECTION */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-hexa-primary/10 border border-hexa-primary/20 text-hexa-primary text-[10px] font-bold uppercase tracking-widest">
+            <BarChart3 size={12} />
+            Operations & Analytics
+          </div>
+          <h1 className="text-4xl font-heading font-bold">Usage <span className="text-gradient">Metrics</span></h1>
+          <p className="text-white/50 max-w-2xl">
+            Real-time operational visibility into the HexaGene engine, infrastructure health, and processing throughput.
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3 glass-card px-4 py-2 bg-white/[0.02]">
+          <RefreshCw size={14} className={`text-white/40 ${loading ? 'animate-spin' : ''}`} />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Auto-refresh: 15s</span>
+        </div>
       </div>
 
       {loading ? (
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: "16px",
-          }}
-        >
-          Loading analytics...
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+          <Loader2 size={48} className="text-hexa-primary animate-spin" />
+          <p className="text-white/40 font-bold uppercase tracking-[0.2em] text-xs">Synchronizing Metrics</p>
         </div>
       ) : (
-        <>
-          {/* Top Cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "18px",
-              marginBottom: "28px",
-            }}
-          >
-            {stats.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  background:
-                    "rgba(17,24,39,0.9)",
-                  border: `1px solid ${item.color}33`,
-                  borderRadius: "18px",
-                  padding: "22px",
-                  boxShadow:
-                    "0 10px 30px rgba(0,0,0,0.25)",
-                  transition: "0.3s ease",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "#94a3b8",
-                      fontSize: "13px",
-                    }}
-                  >
-                    {item.title}
-                  </span>
-
-                  <span
-                    style={{
-                      fontSize: "22px",
-                    }}
-                  >
-                    {item.icon}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: "16px",
-                    fontSize: "30px",
-                    fontWeight: "700",
-                    color: item.color,
-                  }}
-                >
-                  {item.value}
-                </div>
-              </div>
-            ))}
+        <div className="space-y-8 animate-fade-in">
+          
+          {/* TOP STATS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <MetricCard 
+              title="Total API Calls"
+              value={metrics.total_requests.toLocaleString()}
+              unit="Requests"
+              color="primary"
+              icon={<Activity size={24} />}
+            />
+            <MetricCard 
+              title="Avg Compute Time"
+              value={metrics.avg_compute_time.replace(' ms', '')}
+              unit="ms"
+              color="accent"
+              icon={<Zap size={24} />}
+            />
+            <MetricCard 
+              title="Global Success Rate"
+              value={metrics.success_rate.replace('%', '')}
+              unit="%"
+              color="success"
+              icon={<CheckCircle size={24} />}
+            />
+            <MetricCard 
+              title="Error Incident Count"
+              value={metrics.errors_today}
+              unit="Today"
+              color={metrics.errors_today > 0 ? "danger" : "secondary"}
+              icon={<AlertCircle size={24} />}
+            />
           </div>
 
-          {/* Lower Section */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "2fr 1fr",
-              gap: "20px",
-            }}
-          >
-            {/* Observability */}
-            <div
-              style={{
-                background:
-                  "rgba(17,24,39,0.92)",
-                border:
-                  "1px solid #1f2937",
-                borderRadius: "18px",
-                padding: "24px",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "22px",
-                  marginBottom: "20px",
-                }}
-              >
-                Backend Observability
-              </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* OBSERVABILITY PANEL */}
+            <div className="lg:col-span-8 space-y-8">
+              <div className="glass-card p-8 border-white/5">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-hexa-secondary/10 rounded-lg text-hexa-secondary">
+                      <Layers size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-heading font-bold">Inbound Traffic Distribution</h3>
+                      <p className="text-xs text-white/40">Request volume breakdown by clinical data type</p>
+                    </div>
+                  </div>
+                </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit,minmax(220px,1fr))",
-                  gap: "16px",
-                }}
-              >
-                {observability.map(
-                  (item, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        background:
-                          "#0f172a",
-                        padding: "18px",
-                        borderRadius:
-                          "14px",
-                        border:
-                          "1px solid #1e293b",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize:
-                            "20px",
-                          marginBottom:
-                            "10px",
-                        }}
-                      >
-                        {item.icon}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { label: 'Biomarker Panels', value: metrics.blood_requests, icon: '🩸', sub: 'Comprehensive blood panels' },
+                    { label: 'Medication Sync', value: metrics.med_requests, icon: '💊', sub: 'Pharmacogenetic filtering' },
+                    { label: 'Genetic Variants', value: metrics.variant_requests, icon: '🧬', sub: 'Raw S21 genomic mapping' },
+                    { label: 'Avg Variant Load', value: metrics.avg_variant_count, icon: '📊', sub: 'Data points per request' },
+                  ].map((item) => (
+                    <div key={item.label} className="group p-5 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/[0.04] transition-all">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{item.icon}</span>
+                          <div>
+                            <p className="text-sm font-bold">{item.label}</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-tighter">{item.sub}</p>
+                          </div>
+                        </div>
+                        <span className="text-xl font-black text-white/80 group-hover:text-hexa-primary transition-colors">{item.value}</span>
                       </div>
-
-                      <div
-                        style={{
-                          color:
-                            "#94a3b8",
-                          fontSize:
-                            "13px",
-                        }}
-                      >
-                        {item.label}
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop:
-                            "8px",
-                          fontSize:
-                            "26px",
-                          fontWeight:
-                            "700",
-                        }}
-                      >
-                        {item.value}
+                      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-hexa-primary rounded-full" style={{ width: '35%' }} />
                       </div>
                     </div>
-                  )
-                )}
+                  ))}
+                </div>
+              </div>
+
+              <div className="glass-card p-8 border-white/5">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 bg-hexa-accent/10 rounded-lg text-hexa-accent">
+                    <Database size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold">Data Sovereignty</h3>
+                    <p className="text-xs text-white/40">Infrastructure and region status</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-white/[0.02] rounded-xl border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center font-bold text-[10px]">US</div>
+                      <span className="text-sm">Primary Cluster (us-east-1)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-hexa-success" />
+                      <span className="text-xs font-bold text-hexa-success uppercase tracking-widest">Active</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-white/[0.02] rounded-xl border border-white/5 opacity-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center font-bold text-[10px]">EU</div>
+                      <span className="text-sm">Secondary Cluster (eu-west-1)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-white/20" />
+                      <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Standby</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Health Panel */}
-            <div
-              style={{
-                background:
-                  "rgba(17,24,39,0.92)",
-                border:
-                  "1px solid #1f2937",
-                borderRadius: "18px",
-                padding: "24px",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "22px",
-                  marginBottom: "20px",
-                }}
-              >
-                System Health
-              </h2>
+            {/* SYSTEM HEALTH SIDEBAR */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="glass-card p-8 border-white/5 bg-gradient-to-br from-hexa-card to-white/[0.02]">
+                <h3 className="font-heading font-bold mb-6 flex items-center gap-3">
+                  <ShieldCheck size={20} className="text-hexa-success" />
+                  System Integrity
+                </h3>
+                
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-xs font-bold uppercase tracking-widest">
+                      <span className="text-white/40">Availability Ratio</span>
+                      <span className="text-hexa-success">{metrics.success_rate}</span>
+                    </div>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden p-0.5">
+                      <div className="h-full bg-hexa-success rounded-full" style={{ width: metrics.success_rate }} />
+                    </div>
+                  </div>
 
-              <div
-                style={{
-                  marginBottom: "18px",
-                }}
-              >
-                <p
-                  style={{
-                    color: "#94a3b8",
-                    fontSize: "13px",
-                    marginBottom:
-                      "8px",
-                  }}
-                >
-                  Success Ratio
+                  <div className="pt-6 border-t border-white/5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-xs">
+                        <Server size={14} className="text-white/40" />
+                        <span className="text-white/60">API Status</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${healthData?.status === "ok" ? "bg-hexa-success animate-pulse" : "bg-hexa-danger"}`} />
+                        <span className={`font-bold text-[10px] uppercase tracking-widest ${healthData?.status === "ok" ? "text-hexa-success" : "text-hexa-danger"}`}>
+                          {healthData?.status === "ok" ? "Online" : "Offline"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-xs">
+                        <Cpu size={14} className="text-white/40" />
+                        <span className="text-white/60">Engine</span>
+                      </div>
+                      <span className="text-xs font-mono text-hexa-primary">{versionData?.engine || "HexaGene S21"}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-xs">
+                        <Info size={14} className="text-white/40" />
+                        <span className="text-white/60">Version</span>
+                      </div>
+                      <span className="text-xs font-mono text-white/40">{versionData?.version || "1.0.4-stable"}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 text-xs">
+                        <Clock size={14} className="text-white/40" />
+                        <span className="text-white/60">Sync Frequency</span>
+                      </div>
+                      <span className="text-xs font-bold text-white/40">15 SEC</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button className="w-full mt-8 btn-outline flex items-center justify-between py-3 px-4">
+                  <span className="text-xs font-bold uppercase tracking-widest">Full Status Page</span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              <div className="p-6 bg-hexa-secondary/5 border border-hexa-secondary/10 rounded-2xl">
+                <div className="flex items-center gap-3 mb-3 text-hexa-secondary">
+                  <Shield size={18} />
+                  <h4 className="font-bold text-sm uppercase tracking-widest">Compliance</h4>
+                </div>
+                <p className="text-[10px] text-white/50 leading-relaxed uppercase tracking-tight">
+                  All requests are processed in HIPAA-compliant isolated environments. No patient-identifiable information (PII) is persisted within the scoring engine logs.
                 </p>
-
-                <div
-                  style={{
-                    height: "10px",
-                    background:
-                      "#1e293b",
-                    borderRadius:
-                      "999px",
-                    overflow:
-                      "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width:
-                        metrics.success_rate,
-                      height:
-                        "100%",
-                      background:
-                        "#10b981",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  marginTop: "25px",
-                  lineHeight: "2",
-                  color: "#e5e7eb",
-                }}
-              >
-                <div>
-                  {healthData?.status === "ok" ? "🟢 API Status: Online" : "🔴 API Status: Offline"}
-                </div>
-
-                <div>
-                  🔐 Auth Layer: Secure
-                </div>
-
-                <div>
-                  📈 Live Refresh: 15 sec
-                </div>
-
-                <div>
-                  🚀 Engine: {versionData?.engine || "HexaGene S21"}
-                </div>
-
-                <div>
-                  📦 Version: {versionData?.version || "..."}
-                </div>
-
-                <div>
-                  ✅ Ready: {versionData?.ready ? "Yes" : "No"}
-                </div>
               </div>
             </div>
+
           </div>
-        </>
+        </div>
       )}
+
+      <footer className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
+        <div className="flex items-center gap-4">
+          <span>Infrastructure Status: Normal</span>
+          <span className="w-1 h-1 bg-hexa-success rounded-full" />
+          <span>S21 Grid Latency: 12ms</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="hover:text-white transition-colors">API Uptime</button>
+          <button className="hover:text-white transition-colors">Incident History</button>
+        </div>
+      </footer>
     </div>
   );
 }

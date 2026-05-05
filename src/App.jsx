@@ -12,6 +12,7 @@ import Simulations from './pages/dashboard/Simulations';
 import ApiAccess from './pages/dashboard/ApiAccess';
 import IntegrationDocs from './pages/dashboard/IntegrationDocs';
 import Usage from './pages/dashboard/Usage';
+import Settings from './pages/dashboard/Settings';
 
 // 🔐 PROTECTED ROUTE (TOKEN BASED)
 const ProtectedRoute = ({ children }) => {
@@ -90,7 +91,7 @@ function App() {
           {/* Extra */}
           <Route path="simulations" element={<Simulations />} />
           <Route path="usage" element={<Usage />} />
-          <Route path="settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* ❌ CATCH ALL */}

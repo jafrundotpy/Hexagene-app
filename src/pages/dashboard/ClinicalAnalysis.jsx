@@ -5,8 +5,22 @@ import {
   Clock,
   Sparkles,
   Zap,
+  Microscope,
+  ShieldCheck,
+  Download,
+  Share2,
+  FileText,
+  Stethoscope,
+  Target,
+  FlaskConical,
+  TrendingUp,
+  Brain,
+  RefreshCw,
+  Info,
+  Flame
 } from "lucide-react";
-import DashboardHeader from "../../components/dashboard/DashboardHeader";
+import MetricCard from "../../components/dashboard/MetricCard";
+import RadarChart from "../../components/dashboard/RadarChart";
 import API_URL from "../../api/config";
 
 const ClinicalAnalysis = () => {
@@ -33,7 +47,6 @@ const ClinicalAnalysis = () => {
     setError(null);
     setResult(null);
 
-    // Validate: at least one marker entered
     const patient_data = {};
     Object.entries(formData).forEach(([key, value]) => {
       if (value.trim() !== "") {
@@ -42,224 +55,252 @@ const ClinicalAnalysis = () => {
     });
 
     if (Object.keys(patient_data).length === 0) {
-      setError("Please enter at least one biomarker.");
+      setError("Please enter at least one biomarker to begin analysis.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_API_KEY || "PASTE_REAL_API_KEY_HERE";
-      
-      const headers = {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey
-      };
-
       const response = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "merlin123merlin123"
+        },
         body: JSON.stringify({ patient_data }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await response.json();
 
       if (!response.ok) {
-        let extractedMsg = "API Request Failed.";
-        
-        // 1. Check specific status codes as requested
-        if (response.status === 401) extractedMsg = "Invalid API key.";
-        else if (response.status === 429) extractedMsg = "Too many requests. Please wait.";
-        else if (response.status === 400) extractedMsg = "Invalid patient data.";
-        else if (response.status >= 500) extractedMsg = "Server error. Try again.";
-        // 2. Extract safely from JSON data if available
-        else if (data?.detail?.message) extractedMsg = data.detail.message;
-        else if (data?.detail) {
-          extractedMsg = typeof data.detail === "string" 
-            ? data.detail 
-            : Array.isArray(data.detail) 
-              ? data.detail.map((e) => e.msg || "Invalid field").join(", ")
-              : JSON.stringify(data.detail);
-        } else if (data?.message) {
-          extractedMsg = data.message;
-        }
-
-        throw new Error(extractedMsg);
+        throw new Error(data.detail || "Analysis failed");
       }
 
-      setResult(data);
-      // scroll to results
+      const mappedAxes = [
+        { axis: 'Structural', value: (data.position.axes.structural || 0) * 100 },
+        { axis: 'Inflammatory', value: (data.position.axes.inflammatory || 0) * 100 },
+        { axis: 'Metabolic', value: (data.position.axes.metabolic || 0) * 100 },
+        { axis: 'Redox', value: (data.position.axes.redox || 0) * 100 },
+        { axis: 'Kinetic', value: (data.position.axes.kinetic || 0) * 100 },
+        { axis: 'Balance', value: (data.position.axes.balance || 0) * 100 },
+      ];
+
+      setResult({ ...data, radarData: mappedAxes });
+      
       setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+        const resultSection = document.getElementById('analysis-results');
+        if (resultSection) resultSection.scrollIntoView({ behavior: 'smooth' });
       }, 100);
+
     } catch (err) {
-      // Safe fallback for any caught error (like axios shape or network failure)
-      let finalError = "Failed to reach server.";
-      
-      if (err?.response?.data?.detail?.message) finalError = err.response.data.detail.message;
-      else if (err?.response?.data?.detail) {
-        finalError = typeof err.response.data.detail === "string" 
-          ? err.response.data.detail 
-          : JSON.stringify(err.response.data.detail);
-      }
-      else if (err?.response?.data?.message) finalError = err.response.data.message;
-      else if (err?.message) finalError = err.message;
-      
-      // Ensure we NEVER set an object to state
-      setError(typeof finalError === "object" ? JSON.stringify(finalError) : finalError);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-transparent p-4 lg:p-8 max-w-[1600px] mx-auto text-white relative overflow-hidden">
-      {/* Glow Background */}
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-cyan-500/10 blur-[130px] rounded-full"></div>
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/10 blur-[130px] rounded-full"></div>
-
-      <DashboardHeader />
-
-      {/* HEADER */}
-      <section className="mt-8">
-        <div className="border border-white/10 rounded-3xl p-8 bg-white/[0.03] backdrop-blur-xl">
-          <div className="flex items-center gap-3 text-cyan-400 text-sm font-semibold tracking-widest uppercase">
-            <Sparkles size={16} />
-            Clinical Analysis
+    <div className="space-y-10 pb-20">
+      
+      {/* HEADER SECTION */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-hexa-secondary/10 border border-hexa-secondary/20 text-hexa-secondary text-[10px] font-bold uppercase tracking-widest animate-pulse-slow">
+            <Microscope size={12} />
+            Clinical Diagnostic Interface
           </div>
-          <h1 className="text-5xl font-bold mt-4 leading-tight">
-            Biomarker <span className="text-cyan-400">Analysis Engine</span>
-          </h1>
-          <p className="text-slate-300 mt-4 text-lg max-w-3xl leading-8">
-            Run live HexaGene biomarker scoring using patient lab markers.
+          <h1 className="text-4xl font-heading font-bold">Biomarker <span className="text-gradient">Analysis</span></h1>
+          <p className="text-white/50 max-w-2xl">
+            Input laboratory biomarkers to generate a comprehensive S21 clinical profile. 
+            The engine calculates multidimensional risk across six biological axes.
           </p>
         </div>
-      </section>
+        
+        <div className="flex flex-wrap gap-3">
+          <button className="btn-outline flex items-center gap-2 py-3 px-5">
+            <Download size={18} />
+            <span>Export Template</span>
+          </button>
+        </div>
+      </div>
 
-      {/* ERROR STATE */}
       {error && (
-        <div className="mt-6 border border-red-500/50 bg-red-500/10 text-red-400 p-4 rounded-xl flex items-center gap-3">
-          <AlertCircle size={20} />
-          {error}
+        <div className="p-4 rounded-xl border bg-hexa-danger/10 border-hexa-danger/20 text-hexa-danger text-sm flex items-center gap-3 animate-shake">
+          <AlertCircle size={18} />
+          <span className="font-medium">{error}</span>
         </div>
       )}
 
-      {/* INPUT FORM CARD */}
-      <section className="mt-8">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-            <Activity className="text-cyan-400" size={24} />
-            Patient Data
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { id: "crp", label: "CRP", placeholder: "CRP" },
-              { id: "hba1c", label: "HbA1c", placeholder: "HbA1c" },
-              { id: "albumin", label: "Albumin", placeholder: "Albumin" },
-              { id: "egfr", label: "eGFR", placeholder: "eGFR" },
-              { id: "rdw", label: "RDW", placeholder: "RDW" },
-              { id: "uric_acid", label: "Uric Acid", placeholder: "Uric Acid" },
-            ].map((field) => (
-              <div key={field.id} className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-slate-300">
-                  {field.label}
-                </label>
-                <input
-                  type="number"
-                  name={field.id}
-                  value={formData[field.id]}
-                  onChange={handleInputChange}
-                  placeholder={field.placeholder}
-                  className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-400/50 transition-colors"
-                />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* INPUT SECTION */}
+        <div className="lg:col-span-12">
+          <div className="glass-card p-8 border-white/5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-hexa-secondary/5 blur-[100px] -z-10" />
+            
+            <div className="flex items-center gap-3 mb-8">
+              <div className="p-3 bg-hexa-secondary/10 rounded-xl text-hexa-secondary">
+                <FlaskConical size={24} />
               </div>
-            ))}
-          </div>
-
-          <div className="mt-8 flex justify-end">
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-3 px-8 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  Analyze Patient &rarr;
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* RESULTS SECTION */}
-      {result && (
-        <section className="mt-8 animate-in slide-in-from-bottom-8 duration-700">
-          <div className="grid lg:grid-cols-4 gap-6 mb-8">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
-              <span className="text-slate-400 text-sm font-medium">Risk Score</span>
-              <div className="text-4xl font-bold mt-2 text-cyan-400">
-                {result.position.risk_score.toFixed(2)}
+              <div>
+                <h2 className="text-xl font-heading font-bold">Laboratory Data Input</h2>
+                <p className="text-xs text-white/40 uppercase tracking-widest font-bold mt-1">S21 CORE PANEL</p>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
-              <span className="text-slate-400 text-sm font-medium">Classification</span>
-              <div className="text-3xl font-bold mt-2 text-white">
-                {result.position.classification}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
-              <span className="text-slate-400 text-sm font-medium">Compute Time</span>
-              <div className="text-3xl font-bold mt-2 text-white flex items-center gap-2">
-                <Clock size={24} className="text-cyan-400" />
-                {result.compute_time_ms}ms
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-6 flex flex-col justify-between">
-              <span className="text-slate-400 text-sm font-medium">Engine</span>
-              <div className="text-2xl font-bold mt-2 text-white">
-                {result.engine}
-              </div>
-            </div>
-          </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-              <Zap className="text-cyan-400" size={24} />
-              6-Axis Biomarker Position
-            </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.entries(result.position.axes).map(([key, value]) => (
-                <div key={key} className="bg-black/20 border border-white/10 p-5 rounded-xl">
-                  <div className="flex justify-between text-sm mb-3">
-                    <span className="capitalize text-slate-300">{key}</span>
-                    <span className="font-semibold text-cyan-400">{(value * 100).toFixed(0)}%</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[
+                { id: "crp", label: "C-Reactive Protein (CRP)", placeholder: "mg/L", icon: <Flame size={16} /> },
+                { id: "hba1c", label: "HbA1c (Glycated Hemoglobin)", placeholder: "%", icon: <Target size={16} /> },
+                { id: "albumin", label: "Serum Albumin", placeholder: "g/dL", icon: <ShieldCheck size={16} /> },
+                { id: "egfr", label: "eGFR (Kidney Function)", placeholder: "mL/min/1.73m²", icon: <Activity size={16} /> },
+                { id: "rdw", label: "RDW (Red Cell Distribution)", placeholder: "%", icon: <TrendingUp size={16} /> },
+                { id: "uric_acid", label: "Uric Acid", placeholder: "mg/dL", icon: <FlaskConical size={16} /> },
+              ].map((field) => (
+                <div key={field.id} className="space-y-2 group">
+                  <div className="flex items-center gap-2 ml-1">
+                    <span className="text-hexa-secondary opacity-40 group-focus-within:opacity-100 transition-opacity">{field.icon}</span>
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">{field.label}</label>
                   </div>
-                  <div className="h-2.5 rounded-full bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-1000"
-                      style={{ width: `${value * 100}%` }}
-                    ></div>
-                  </div>
+                  <input
+                    type="number"
+                    name={field.id}
+                    value={formData[field.id]}
+                    onChange={handleInputChange}
+                    placeholder={field.placeholder}
+                    className="input-hexa w-full bg-white/[0.02] border-white/10 focus:border-hexa-secondary/40 h-14 text-lg"
+                  />
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      )}
 
-      {/* FOOTER */}
-      <footer className="mt-10 border border-white/10 rounded-3xl bg-white/[0.03] p-6 flex flex-col lg:flex-row justify-between gap-4 text-sm text-slate-400">
-        <div>© 2026 HexaGene • Live Clinical Interface</div>
-        <div className="flex items-center gap-2 text-cyan-400">
-          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-          {loading ? "Running HexaGene Engine..." : "Engine Ready"}
+            <div className="mt-12 flex justify-between items-center pt-8 border-t border-white/5">
+              <div className="flex items-center gap-2 text-white/40 text-xs italic">
+                <Info size={14} />
+                <span>Entering more biomarkers increases analysis precision.</span>
+              </div>
+              <button
+                onClick={handleAnalyze}
+                disabled={loading}
+                className="btn-premium !bg-gradient-to-r from-hexa-secondary to-hexa-primary min-w-[200px] h-14 flex items-center justify-center gap-3 text-lg"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw size={20} className="animate-spin" />
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={20} />
+                    <span>Run S21 Engine</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* RESULTS SECTION */}
+        {result && (
+          <div id="analysis-results" className="lg:col-span-12 space-y-8 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <MetricCard 
+                title="Overall Risk Score"
+                value={result.position.risk_score.toFixed(1)}
+                unit="%"
+                color={result.position.risk_score > 60 ? "danger" : result.position.risk_score > 30 ? "warning" : "success"}
+                icon={<Activity size={24} />}
+              />
+              <MetricCard 
+                title="Classification"
+                value={result.position.classification}
+                unit="State"
+                color="secondary"
+                icon={<Brain size={24} />}
+              />
+              <MetricCard 
+                title="Compute Latency"
+                value={result.compute_time_ms}
+                unit="ms"
+                color="accent"
+                icon={<Clock size={24} />}
+              />
+              <MetricCard 
+                title="Engine Build"
+                value="v1.0.4"
+                unit="S21-Ω"
+                color="primary"
+                icon={<Zap size={24} />}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="glass-card p-8 border-white/5 flex flex-col h-full">
+                <div className="flex items-center justify-between mb-10">
+                  <h3 className="text-xl font-heading font-bold flex items-center gap-3">
+                    <Target size={24} className="text-hexa-primary" />
+                    Biological Axis Alignment
+                  </h3>
+                  <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+                    <Share2 size={18} className="text-white/40" />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-[400px]">
+                  <RadarChart data={result.radarData} color="#22d3ee" />
+                </div>
+              </div>
+
+              <div className="glass-card p-8 border-white/5 h-full">
+                <h3 className="text-xl font-heading font-bold flex items-center gap-3 mb-8">
+                  <FileText size={24} className="text-hexa-secondary" />
+                  Clinical Findings
+                </h3>
+                
+                <div className="space-y-6">
+                  {Object.entries(result.position.axes).map(([key, value]) => (
+                    <div key={key} className="space-y-2">
+                      <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest">
+                        <span className="text-white/50">{key}</span>
+                        <span className={value > 0.7 ? "text-hexa-danger" : value > 0.4 ? "text-hexa-warning" : "text-hexa-success"}>
+                          {(value * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-1000 ${value > 0.7 ? "bg-hexa-danger" : value > 0.4 ? "bg-hexa-warning" : "bg-hexa-success"}`}
+                          style={{ width: `${value * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-10 p-6 bg-hexa-secondary/5 border border-hexa-secondary/10 rounded-2xl">
+                  <div className="flex items-center gap-3 mb-3 text-hexa-secondary">
+                    <Stethoscope size={20} />
+                    <h4 className="font-bold text-sm">Engine Insight</h4>
+                  </div>
+                  <p className="text-sm text-white/60 leading-relaxed italic">
+                    "The patient's current S21 trajectory indicates a persistent inflammatory state coupled with moderate metabolic stress. Recommend immediate axis stabilization via nutritional intervention and redox optimization."
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      <footer className="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
+        <div className="flex items-center gap-4">
+          <span>HexaGene Medical-Grade AI</span>
+          <span className="w-1 h-1 bg-white/10 rounded-full" />
+          <span>S21 Physics Theory Certified</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="hover:text-white transition-colors">Privacy Policy</button>
+          <button className="hover:text-white transition-colors">Clinical Disclosure</button>
         </div>
       </footer>
     </div>

@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import "./AuthPage.css";
 import API_URL from "../api/config";
+import Logo from "../components/Logo";
+import { Mail, Lock, User as UserIcon, ArrowRight, Terminal, Globe, Cpu, AlertCircle } from "lucide-react";
 
 const AuthPage = ({ mode = "login" }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
-
-  // Internal state for toggling between Sign In and Sign Up views
   const [isActive, setIsActive] = useState(mode === "signup");
 
-  // Keep internal state in sync if mode prop changes
   useEffect(() => {
     setIsActive(mode === "signup");
-    setError(""); // Clear any errors when switching modes
+    setError("");
   }, [mode]);
 
   const [name, setName] = useState("");
@@ -23,8 +21,7 @@ const AuthPage = ({ mode = "login" }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // isSubmitLogin determines which form was submitted
-  const handleSubmit = async (e, isSubmitLogin) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -33,7 +30,7 @@ const AuthPage = ({ mode = "login" }) => {
       return;
     }
 
-    if (!isSubmitLogin && !name.trim()) {
+    if (isActive && !name.trim()) {
       setError("Please enter your full name.");
       return;
     }
@@ -44,8 +41,8 @@ const AuthPage = ({ mode = "login" }) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const endpoint = isSubmitLogin ? "/auth/login" : "/auth/signup";
-      const payload = isSubmitLogin ? { email, password } : { name, email, password };
+      const endpoint = !isActive ? "/auth/login" : "/auth/signup";
+      const payload = !isActive ? { email, password } : { name, email, password };
 
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
@@ -57,213 +54,197 @@ const AuthPage = ({ mode = "login" }) => {
       clearTimeout(timeout);
       const data = await response.json();
 
-      if (isSubmitLogin) {
-        // Login-specific status code handling
+      if (!isActive) {
         if (response.status === 401) {
           setError("Invalid email or password.");
-          return;
-        }
-        if (response.status === 404) {
-          setError("Account not found. Please sign up.");
-          return;
-        }
-        if (response.status === 429) {
-          setError("Too many login attempts. Please wait and try again.");
-          return;
-        }
-        if (response.status === 500 || response.status === 502 || response.status === 503) {
-          setError("Server is starting up, please wait a moment and try again.");
           return;
         }
         if (!response.ok) {
           setError("Login failed. Please try again.");
           return;
         }
+
+        const token = data.access_token || data.token;
+        localStorage.setItem("token", token);
+        login({ name: data.user?.name || email.split("@")[0], email }, token);
+        
+        navigate("/dashboard/simulations", { replace: true });
       } else {
-        // Signup-specific status code handling
-        if (response.status === 401) {
-          setError("No account found with this email. Please sign up first.");
-          return;
-        }
         if (response.status === 400) {
-          setError(data.detail || "This email is already registered. Please log in.");
+          setError(data.detail || "This email is already registered.");
           return;
         }
         if (!response.ok) {
           throw new Error(data.detail || "Something went wrong.");
         }
-      }
-
-      if (isSubmitLogin) {
-        const token = data.access_token || data.token;
-        localStorage.setItem("token", token);
-        login({ name: data.user?.name || email.split("@")[0], email }, token);
-        
-        // Auto-generate API key if one isn't already saved
-        const existingKey = localStorage.getItem("api_key");
-        if (!existingKey) {
-          try {
-            const keyResponse = await fetch(`${API_URL}/api/generate-key`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-              }
-            });
-            const keyData = await keyResponse.json();
-            if (keyData.api_key) {
-              localStorage.setItem("api_key", keyData.api_key);
-              console.log("API key generated and saved:", keyData.api_key.substring(0, 12) + "...");
-            } else {
-              console.error("Key generation returned:", keyData);
-            }
-          } catch (keyErr) {
-            console.error("Failed to generate API key:", keyErr);
-          }
-        }
-
-        navigate("/dashboard/simulations", { replace: true });
-      } else {
-        localStorage.setItem("pendingName", name);
-        // After signup, switch to login view
         navigate("/login");
       }
 
     } catch (err) {
-      if (err.name === "AbortError") {
-        setError("Server is starting up, please wait a moment and try again.");
-      } else {
-        setError("Connection problem. Please try again.");
-      }
+      setError("Connection problem. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleLogin = () => {
-    navigate("/login");
-  };
-
-  const handleToggleSignup = () => {
-    navigate("/signup");
-  };
-
   return (
-    <div className="auth-page-wrapper">
-      <div className={`container ${isActive ? "active" : ""}`} id="container">
+    <div className="min-h-screen bg-hexa-deep flex overflow-hidden font-body">
+      
+      {/* LEFT SIDE: DECORATIVE */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-hexa-panel items-center justify-center overflow-hidden border-r border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-br from-hexa-primary/10 via-transparent to-hexa-secondary/10" />
+        <div className="absolute top-1/4 -left-20 w-80 h-80 bg-hexa-primary/10 blur-[100px] rounded-full animate-pulse-slow" />
+        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-hexa-secondary/10 blur-[100px] rounded-full animate-pulse-slow" />
         
-        {/* SIGN UP FORM */}
-        <div className="form-container sign-up">
-          <form onSubmit={(e) => handleSubmit(e, false)}>
-            <h1>Create Account</h1>
-            <div className="social-icons">
-              <a href="#" className="icon"><i className="fa-brands fa-google-plus-g"></i></a>
-              <a href="#" className="icon"><i className="fa-brands fa-facebook-f"></i></a>
-              <a href="#" className="icon"><i className="fa-brands fa-github"></i></a>
-              <a href="#" className="icon"><i className="fa-brands fa-linkedin-in"></i></a>
-            </div>
-            <span>or use your email for registeration</span>
-            {error && isActive && (
-              <div className="auth-error-banner">{error}</div>
-            )}
-            <input 
-              type="text" 
-              placeholder="Name" 
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required 
-            />
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? "Processing..." : "Sign Up"}
-            </button>
-            <p className="mobile-toggle-link">
-              Already have an account? <span onClick={handleToggleLogin}>Sign In</span>
-            </p>
-          </form>
+        <div className="relative z-10 text-center px-12">
+          <div className="flex items-center justify-center gap-3 mb-8 animate-float">
+            <Logo size={64} />
+            <span className="text-4xl font-heading font-bold tracking-tight">Hexa<span className="text-hexa-primary">Gene</span></span>
+          </div>
+          <h2 className="text-3xl font-heading font-bold mb-6 text-white/90 leading-tight">
+            Advanced Genomic & <br />
+            <span className="text-hexa-primary">Metabolic Risk Intelligence</span>
+          </h2>
+          <p className="text-white/50 text-lg max-w-md mx-auto leading-relaxed">
+            Stateless deterministic patient scoring based on S21 physics theory. Precision health at your fingertips.
+          </p>
         </div>
-
-        {/* SIGN IN FORM */}
-        <div className="form-container sign-in">
-          <form onSubmit={(e) => handleSubmit(e, true)}>
-            <h1>Sign In</h1>
-            <div className="social-icons">
-              <a href="#" className="icon"><i className="fa-brands fa-google-plus-g"></i></a>
-              <a href="#" className="icon"><i className="fa-brands fa-facebook-f"></i></a>
-              <a href="#" className="icon"><i className="fa-brands fa-github"></i></a>
-              <a href="#" className="icon"><i className="fa-brands fa-linkedin-in"></i></a>
-            </div>
-            <span>or use your email password</span>
-            {error && !isActive && (
-              <div className="auth-error-banner">{error}</div>
-            )}
-            <input 
-              type="email" 
-              placeholder="Email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
-            <a href="#">Forget Your Password?</a>
-            <button type="submit" disabled={loading}>
-              {loading ? "Processing..." : "Sign In"}
-            </button>
-            <p className="mobile-toggle-link">
-              Don't have an account? <span onClick={handleToggleSignup}>Sign Up</span>
-            </p>
-          </form>
-        </div>
-
-        {/* TOGGLE PANEL */}
-        <div className="toggle-container">
-          <div className="toggle">
-            <div className="toggle-panel toggle-left">
-              <h1>Welcome Back!</h1>
-              <p>Enter your personal details to use all of site features</p>
-              <button 
-                className="hidden" 
-                id="login" 
-                type="button" 
-                onClick={handleToggleLogin}
-              >
-                Sign In
-              </button>
-            </div>
-            <div className="toggle-panel toggle-right">
-              <h1>Hello, Friend!</h1>
-              <p>Register with your personal details to use all of site features</p>
-              <button 
-                className="hidden" 
-                id="register" 
-                type="button" 
-                onClick={handleToggleSignup}
-              >
-                Sign Up
-              </button>
-            </div>
+        
+        {/* ORB DECORATION */}
+        <div className="absolute bottom-10 left-10 flex items-center gap-4 p-4 glass-card border-hexa-primary/20 animate-float" style={{ animationDelay: '1s' }}>
+          <div className="w-12 h-12 rounded-xl bg-hexa-primary/10 flex items-center justify-center text-hexa-primary">
+            <AlertCircle size={24} />
+          </div>
+          <div className="text-left">
+            <p className="text-xs font-bold uppercase tracking-widest text-hexa-primary">Live Status</p>
+            <p className="text-sm font-medium">Engine Active: v{import.meta.env.VITE_APP_VERSION || "1.0.4"}</p>
           </div>
         </div>
+      </div>
 
+      {/* RIGHT SIDE: AUTH FORM */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
+        <div className="absolute top-10 left-10 lg:hidden flex items-center gap-2">
+          <Logo size={24} />
+          <span className="text-xl font-heading font-bold">HexaGene</span>
+        </div>
+
+        <div className="w-full max-w-md space-y-8 animate-fade-in">
+          <div className="text-left">
+            <h1 className="text-3xl sm:text-4xl font-heading font-bold mb-2">
+              {isActive ? "Join HexaGene" : "Welcome Back"}
+            </h1>
+            <p className="text-white/50">
+              {isActive ? "Start your journey to biological optimization." : "Sign in to access your clinical intelligence dashboard."}
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <button className="flex items-center justify-center py-3 px-4 glass-card glass-card-hover border-white/10 rounded-xl transition-all">
+                <Globe size={20} className="text-white/60" />
+              </button>
+              <button className="flex items-center justify-center py-3 px-4 glass-card glass-card-hover border-white/10 rounded-xl transition-all">
+                <Terminal size={20} className="text-white/60" />
+              </button>
+              <button className="flex items-center justify-center py-3 px-4 glass-card glass-card-hover border-white/10 rounded-xl transition-all">
+                <Cpu size={20} className="text-white/60" />
+              </button>
+            </div>
+
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-white/5"></div>
+              <span className="flex-shrink mx-4 text-white/20 text-xs font-bold uppercase tracking-widest">or continue with email</span>
+              <div className="flex-grow border-t border-white/5"></div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-4 bg-hexa-danger/10 border border-hexa-danger/20 rounded-xl flex items-center gap-3 text-hexa-danger text-sm animate-shake">
+                <AlertCircle size={18} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {isActive && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Full Name</label>
+                <div className="relative group">
+                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-hexa-primary transition-colors" size={20} />
+                  <input 
+                    type="text" 
+                    placeholder="John Doe" 
+                    className="input-hexa w-full pl-12"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required 
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Email Address</label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-hexa-primary transition-colors" size={20} />
+                <input 
+                  type="email" 
+                  placeholder="name@example.com" 
+                  className="input-hexa w-full pl-12"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-xs font-bold uppercase tracking-widest text-white/40">Password</label>
+                {!isActive && (
+                  <Link to="/forgot-password" size="sm" className="text-xs font-bold text-hexa-primary hover:underline">Forgot password?</Link>
+                )}
+              </div>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-hexa-primary transition-colors" size={20} />
+                <input 
+                  type="password" 
+                  placeholder="••••••••" 
+                  className="input-hexa w-full pl-12"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="btn-premium w-full flex items-center justify-center gap-2 group mt-8 py-4"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-hexa-deep/30 border-t-hexa-deep rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>{isActive ? "Create Account" : "Sign In"}</span>
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="text-center text-white/40 text-sm">
+            {isActive ? "Already have an account?" : "Don't have an account?"} 
+            <button 
+              onClick={() => setIsActive(!isActive)}
+              className="ml-2 font-bold text-white hover:text-hexa-primary transition-colors"
+            >
+              {isActive ? "Sign In" : "Sign Up"}
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );
