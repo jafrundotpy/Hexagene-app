@@ -15,7 +15,9 @@ import {
   Info,
   ChevronRight,
   Plus,
-  Loader2
+  Loader2,
+  Stethoscope,
+  ClipboardCheck
 } from "lucide-react";
 import MetricCard from "../../components/dashboard/MetricCard";
 import RadarChart from "../../components/dashboard/RadarChart";
@@ -43,7 +45,7 @@ const Simulations = () => {
   const handleSyncWearable = async () => {
     try {
       setLoading(true);
-      setStatusMsg("Syncing with Supabase...");
+      setStatusMsg("Syncing with health database...");
       
       const token = localStorage.getItem("token");
       let userId = "demo-user";
@@ -92,7 +94,7 @@ const Simulations = () => {
     if (!file) return;
     try {
       setUploading(true);
-      setStatusMsg("Processing health screenshot...");
+      setStatusMsg("Processing biometric screenshot...");
       const formData = new FormData();
       formData.append("file", file);
       
@@ -123,13 +125,13 @@ const Simulations = () => {
 
   const handleRunAnalysis = async () => {
     if (!form.age || !form.sex) {
-      setStatusMsg("⚠️ Age and Sex are required for analysis");
+      setStatusMsg("⚠️ Age and Sex are required for clinical analysis");
       return;
     }
 
     try {
       setLoading(true);
-      setStatusMsg("Running S21 scoring engine...");
+      setStatusMsg("Calculating health score...");
       
       const token = localStorage.getItem("token");
       let userId = "demo-user";
@@ -163,7 +165,7 @@ const Simulations = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error("Scoring engine error");
+      if (!response.ok) throw new Error("Analysis engine error");
       const data = await response.json();
 
       const pos = data.position || data;
@@ -188,20 +190,22 @@ const Simulations = () => {
     }
   };
 
-  const inputGroup = (title, icon, fields) => (
-    <div className="glass-card p-6 border-white/5 space-y-4">
+  const inputGroup = (title, icon, fields, colorClass) => (
+    <div className="health-card p-6 space-y-4">
       <div className="flex items-center gap-3 mb-2">
-        <div className="p-2 bg-white/5 rounded-lg text-hexa-primary">{icon}</div>
-        <h3 className="font-heading font-bold text-sm tracking-wide uppercase opacity-60">{title}</h3>
+        <div className={`p-2 rounded-lg ${colorClass}`}>
+          {React.cloneElement(icon, { size: 18 })}
+        </div>
+        <h3 className="font-bold text-sm text-health-text">{title}</h3>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {fields.map(f => (
           <div key={f.key} className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-white/40 ml-1">{f.label}</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-health-muted ml-1">{f.label}</label>
             <input 
               type="text" 
               placeholder={f.placeholder}
-              className="input-hexa w-full !bg-white/[0.03] border-white/5 focus:border-hexa-primary/40"
+              className="input-health w-full py-2 px-3 !bg-health-bg/50 focus:!bg-white"
               value={form[f.key]}
               onChange={(e) => updateField(f.key, e.target.value)}
             />
@@ -215,16 +219,16 @@ const Simulations = () => {
     <div className="space-y-10 pb-20">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-hexa-primary/10 border border-hexa-primary/20 text-hexa-primary text-[10px] font-bold uppercase tracking-widest animate-pulse-slow">
-            <Zap size={12} />
-            Simulation Mode Active
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 border border-green-100 text-health-primary text-[10px] font-bold uppercase tracking-widest">
+            <Stethoscope size={12} />
+            Diagnostic Simulation
           </div>
-          <h1 className="text-4xl font-heading font-bold">Biometric <span className="text-gradient">Simulation</span></h1>
-          <p className="text-white/50 max-w-2xl">
-            Fine-tune your biomarkers to see how they impact your overall risk score and biological axes. 
-            Connect your wearable for live data or upload a screenshot.
+          <h1 className="text-4xl font-heading font-black text-health-text">Health <span className="text-health-primary">Simulation</span></h1>
+          <p className="text-health-muted max-w-2xl leading-relaxed">
+            Adjust your biometric markers to simulate clinical outcomes and overall health scoring.
+            Connect sensors for live data or upload medical reports.
           </p>
         </div>
         
@@ -232,30 +236,30 @@ const Simulations = () => {
           <button 
             onClick={handleSyncWearable}
             disabled={loading}
-            className="btn-outline flex items-center gap-2 py-3 px-5"
+            className="btn-health-outline flex items-center gap-2"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-            <span>Sync Wearable</span>
+            <span>Sync Live Data</span>
           </button>
           <button 
             onClick={handleRunAnalysis}
             disabled={loading}
-            className="btn-premium flex items-center gap-2 py-3 px-8"
+            className="btn-health-primary flex items-center gap-2 px-8"
           >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <Dna size={18} />}
-            <span>Run Complete Analysis</span>
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <ClipboardCheck size={18} />}
+            <span>Run Analysis</span>
           </button>
         </div>
       </div>
 
       {statusMsg && (
         <div className={`p-4 rounded-xl border flex items-center gap-3 text-sm animate-fade-in ${
-          statusMsg.includes('❌') ? 'bg-hexa-danger/10 border-hexa-danger/20 text-hexa-danger' : 
-          statusMsg.includes('⚠️') ? 'bg-hexa-warning/10 border-hexa-warning/20 text-hexa-warning' :
-          'bg-hexa-success/10 border-hexa-success/20 text-hexa-success'
+          statusMsg.includes('❌') ? 'bg-red-50 border-red-100 text-red-600' : 
+          statusMsg.includes('⚠️') ? 'bg-orange-50 border-orange-100 text-orange-600' :
+          'bg-green-50 border-green-100 text-health-primary'
         }`}>
           <Info size={18} />
-          <span className="font-medium">{statusMsg}</span>
+          <span className="font-bold">{statusMsg}</span>
         </div>
       )}
 
@@ -271,65 +275,63 @@ const Simulations = () => {
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFileUpload(e.dataTransfer.files[0]); }}
             onClick={() => fileRef.current.click()}
             className={`
-              glass-card p-10 border-dashed border-2 cursor-pointer transition-all duration-300
-              ${dragOver ? 'border-hexa-primary bg-hexa-primary/5' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.02]'}
+              health-card p-10 border-dashed border-2 cursor-pointer transition-all duration-300
+              ${dragOver ? 'border-health-primary bg-green-50' : 'border-health-border hover:border-health-primary hover:bg-green-50/30'}
             `}
           >
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e.target.files[0])} />
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-hexa-primary/10 flex items-center justify-center text-hexa-primary group-hover:scale-110 transition-transform">
+              <div className="w-16 h-16 rounded-full bg-health-bg flex items-center justify-center text-health-muted group-hover:scale-110 transition-transform">
                 {uploading ? <RefreshCw size={32} className="animate-spin" /> : <Upload size={32} />}
               </div>
               <div>
-                <p className="text-lg font-bold">Upload Health Screenshot</p>
-                <p className="text-white/40 text-sm mt-1">Drag and drop or click to upload your QRing dashboard</p>
+                <p className="text-lg font-bold text-health-text">Import Medical Report</p>
+                <p className="text-health-muted text-sm mt-1">Drag and drop or click to upload your diagnostic screenshot</p>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {inputGroup("Demographics", <User size={18} />, [
+            {inputGroup("Patient Basics", <User />, [
               { label: "Age", key: "age", placeholder: "35" },
               { label: "Sex", key: "sex", placeholder: "M/F" }
-            ])}
+            ], "bg-blue-50 text-blue-600")}
             
-            {inputGroup("Clinical Markers", <Heart size={18} />, [
+            {inputGroup("Clinical Lab", <Heart />, [
               { label: "CRP (mg/L)", key: "crp", placeholder: "1.2" },
               { label: "HbA1c (%)", key: "hba1c", placeholder: "5.4" }
-            ])}
+            ], "bg-red-50 text-red-600")}
 
-            {inputGroup("Performance", <Zap size={18} />, [
+            {inputGroup("Readiness", <Zap />, [
               { label: "HRV (ms)", key: "hrv", placeholder: "55" },
               { label: "Resting HR", key: "restingHR", placeholder: "62" }
-            ])}
+            ], "bg-orange-50 text-orange-600")}
 
-            {inputGroup("Recovery", <Moon size={18} />, [
+            {inputGroup("Recovery", <Moon />, [
               { label: "Sleep (hrs)", key: "sleepDuration", placeholder: "7.5" },
-              { label: "Stress", key: "stress", placeholder: "28" }
-            ])}
+              { label: "Stress Score", key: "stress", placeholder: "28" }
+            ], "bg-indigo-50 text-indigo-600")}
 
-            {inputGroup("Activity", <Flame size={18} />, [
-              { label: "Steps", key: "dailySteps", placeholder: "8500" },
-              { label: "Calories", key: "calories", placeholder: "2400" }
-            ])}
+            {inputGroup("Activity", <Flame />, [
+              { label: "Daily Steps", key: "dailySteps", placeholder: "8500" },
+              { label: "Calorie Burn", key: "calories", placeholder: "2400" }
+            ], "bg-green-50 text-health-primary")}
 
-            {inputGroup("Vitality", <Activity size={18} />, [
-              { label: "Oxygen (%)", key: "oxygen", placeholder: "98" },
+            {inputGroup("Vitals", <Activity />, [
+              { label: "Oxygen SpO2", key: "oxygen", placeholder: "98" },
               { label: "Active Min", key: "activeMinutes", placeholder: "45" }
-            ])}
+            ], "bg-cyan-50 text-cyan-600")}
           </div>
         </div>
 
         {/* RIGHT COLUMN: RESULTS */}
         <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-28">
           
-          <div className="glass-card p-8 border-hexa-primary/20 bg-gradient-to-br from-hexa-card to-hexa-primary/5 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-hexa-primary/10 blur-3xl -z-10" />
-            
+          <div className="health-card p-8 bg-white overflow-hidden relative border-t-4 border-t-health-primary">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-heading font-bold">Analysis Results</h3>
-              <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${analysisRun ? 'bg-hexa-success/20 text-hexa-success' : 'bg-white/10 text-white/40'}`}>
-                {analysisRun ? 'Live' : 'Pending'}
+              <h3 className="text-xl font-bold text-health-text">Analysis Results</h3>
+              <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${analysisRun ? 'bg-green-100 text-health-primary' : 'bg-gray-100 text-gray-400'}`}>
+                {analysisRun ? 'Finalized' : 'Draft'}
               </div>
             </div>
 
@@ -338,33 +340,33 @@ const Simulations = () => {
                 <div className="flex flex-col items-center text-center">
                   <div className="relative w-48 h-48 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="45" className="stroke-white/5 fill-none" strokeWidth="8" />
+                      <circle cx="50" cy="50" r="45" className="stroke-health-surface fill-none" strokeWidth="6" />
                       <circle 
                         cx="50" cy="50" r="45" 
-                        className={`fill-none transition-all duration-1000 ${riskScore > 70 ? 'stroke-hexa-danger' : riskScore > 40 ? 'stroke-hexa-warning' : 'stroke-hexa-success'}`} 
-                        strokeWidth="8" 
+                        className={`fill-none transition-all duration-1000 ${riskScore > 70 ? 'stroke-red-500' : riskScore > 40 ? 'stroke-orange-500' : 'stroke-health-primary'}`} 
+                        strokeWidth="10" 
                         strokeDasharray="283" 
                         strokeDashoffset={283 - (283 * riskScore) / 100}
                         strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-5xl font-heading font-black tracking-tighter">{riskScore}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mt-1">Risk Score</span>
+                      <span className="text-5xl font-black tracking-tighter text-health-text">{riskScore}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-health-muted mt-1">Health Score</span>
                     </div>
                   </div>
                   <div className="mt-6 space-y-1">
-                    <p className={`text-lg font-bold ${riskScore > 70 ? 'text-hexa-danger' : riskScore > 40 ? 'text-hexa-warning' : 'text-hexa-success'}`}>
-                      {riskScore > 70 ? 'High Risk Profile' : riskScore > 40 ? 'Moderate Risk Profile' : 'Low Risk Profile'}
+                    <p className={`text-lg font-bold ${riskScore > 70 ? 'text-red-600' : riskScore > 40 ? 'text-orange-600' : 'text-health-primary'}`}>
+                      {riskScore > 70 ? 'High Risk Profile' : riskScore > 40 ? 'Moderate Risk Profile' : 'Optimal Health Status'}
                     </p>
-                    <p className="text-sm text-white/40">S21 Engine Tier: {analysisData?.tier || 'Ω₂₁'}</p>
+                    <p className="text-sm text-health-muted">Diagnostic Classification: {analysisData?.classification || 'Stable'}</p>
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-white/5">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-white/40 mb-6 flex items-center gap-2">
-                    <ShieldAlert size={14} className="text-hexa-primary" />
-                    Biological Axis Alignment
+                <div className="pt-8 border-t border-health-border">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-health-muted mb-8 flex items-center gap-2">
+                    <Activity size={14} className="text-health-primary" />
+                    Biological Axis Distribution
                   </h4>
                   <div className="h-[300px]">
                     <RadarChart data={analysisData.radarData} />
@@ -372,33 +374,33 @@ const Simulations = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-white/[0.03] rounded-xl border border-white/5 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Completeness</p>
-                    <p className="text-lg font-bold text-hexa-primary">{Math.round((analysisData?.completeness || 0) * 100)}%</p>
+                  <div className="p-4 bg-health-surface rounded-2xl border border-health-border space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-health-muted">Data Confidence</p>
+                    <p className="text-lg font-black text-health-primary">{Math.round((analysisData?.completeness || 0) * 100)}%</p>
                   </div>
-                  <div className="p-4 bg-white/[0.03] rounded-xl border border-white/5 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Classification</p>
-                    <p className="text-lg font-bold text-hexa-accent truncate">{analysisData?.classification || 'Stable'}</p>
+                  <div className="p-4 bg-health-surface rounded-2xl border border-health-border space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-health-muted">Tier Status</p>
+                    <p className="text-lg font-black text-health-text truncate">{analysisData?.tier || 'Ω₂₁'}</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="py-20 flex flex-col items-center text-center space-y-4 opacity-30">
-                <Dna size={64} className="animate-float" />
-                <p className="max-w-[200px] text-sm">Enter your biomarkers and click analysis to see results</p>
+              <div className="py-24 flex flex-col items-center text-center space-y-4 opacity-30">
+                <Dna size={64} className="text-health-primary" />
+                <p className="max-w-[200px] text-sm font-bold text-health-text">Adjust biomarkers and run analysis to generate score</p>
               </div>
             )}
           </div>
 
-          <div className="glass-card p-6 border-hexa-secondary/20 space-y-4">
-            <h4 className="text-sm font-bold flex items-center gap-2">
-              <Plus size={18} className="text-hexa-secondary" />
+          <div className="health-card p-6 bg-health-surface/50 space-y-4">
+            <h4 className="text-sm font-bold flex items-center gap-2 text-health-text">
+              <Plus size={18} className="text-health-secondary" />
               Optimization Plan
             </h4>
-            <p className="text-xs text-white/50 leading-relaxed">
-              Based on the current S21 state, the engine recommends prioritizing metabolic stabilization and redox recovery.
+            <p className="text-xs text-health-muted leading-relaxed">
+              Based on the simulated state, the engine recommends prioritizing <span className="text-health-primary font-bold">metabolic stabilization</span> and improved <span className="text-health-secondary font-bold">sleep hygiene</span>.
             </p>
-            <button className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
+            <button className="w-full py-3 bg-white border border-health-border hover:bg-gray-50 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
               <span>View Detailed Report</span>
               <ChevronRight size={14} />
             </button>

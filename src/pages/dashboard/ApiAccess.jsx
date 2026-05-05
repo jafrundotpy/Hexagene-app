@@ -20,425 +20,279 @@ import {
   Info,
   ExternalLink,
   ChevronRight,
-  Plus,
-  Activity
+  ShieldAlert
 } from "lucide-react";
 
 const ApiAccess = () => {
   const { user } = useAuth();
   const [keys, setKeys] = useState([]);
-  const [showKeyId, setShowKeyId] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [activeTab, setActiveTab] = useState("keys");
-  const [generatedKey, setGeneratedKey] = useState("");
-
-  const fetchKeys = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/keys`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setKeys(Array.isArray(data) ? data : data.keys || []);
-      }
-    } catch (err) {
-      console.error("Failed to fetch keys", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [showKeyId, setShowKeyId] = useState(null);
+  const [copyStatus, setCopyStatus] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchKeys();
   }, []);
 
-  const handleGenerate = async () => {
+  const fetchKeys = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/keys`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setKeys(data);
+      }
+    } catch (err) {
+      setError("Failed to fetch keys");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateKey = async () => {
     setGenerating(true);
-    setGenerateError("");
-    setGeneratedKey("");
+    setError(null);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/generate-key`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        }
+        headers: { "Authorization": `Bearer ${token}` }
       });
-      const data = await res.json();
-      if (res.ok && data.api_key) {
-        setGeneratedKey(data.api_key);
-        fetchKeys();
+      if (res.ok) {
+        await fetchKeys();
       } else {
-        setGenerateError(data.detail || "Failed to generate key");
+        const data = await res.json();
+        setError(data.detail || "Generation failed");
       }
     } catch (err) {
-      setGenerateError(err.message);
+      setError("Network error during generation");
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleCopy = (key) => {
-    navigator.clipboard.writeText(key);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleRevoke = async (id) => {
-    if (confirmDeleteId === id) {
-      try {
-        const token = localStorage.getItem("token");
-        await fetch(`${API_URL}/api/keys/${id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setConfirmDeleteId(null);
-        setGeneratedKey("");
-        fetchKeys();
-      } catch (err) {
-        console.error(err);
+  const deleteKey = async (id) => {
+    if (!window.confirm("Are you sure you want to revoke this API key? Connections using this key will fail immediately.")) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/keys/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setKeys(keys.filter(k => k.id !== id));
       }
-    } else {
-      setConfirmDeleteId(id);
-      setTimeout(() => setConfirmDeleteId(null), 4000);
+    } catch (err) {
+      setError("Failed to revoke key");
     }
   };
 
-  const CodeBlock = ({ code, lang }) => (
-    <div className="bg-black/40 rounded-xl border border-white/5 overflow-hidden font-mono text-xs">
-      <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-bottom border-white/5">
-        <span className="text-white/40 uppercase tracking-widest font-bold">{lang}</span>
-        <button onClick={() => handleCopy(code)} className="text-white/40 hover:text-hexa-primary transition-colors">
-          <Copy size={14} />
-        </button>
-      </div>
-      <div className="p-4 overflow-x-auto text-hexa-primary leading-relaxed whitespace-pre">
-        {code}
-      </div>
-    </div>
-  );
+  const copyToClipboard = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopyStatus(id);
+    setTimeout(() => setCopyStatus(null), 2000);
+  };
+
+  const toggleKeyVisibility = (id) => {
+    setShowKeyId(showKeyId === id ? null : id);
+  };
 
   return (
     <div className="space-y-10 pb-20">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-hexa-accent/10 border border-hexa-accent/20 text-hexa-accent text-[10px] font-bold uppercase tracking-widest">
-            <Shield size={12} />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-health-primary/10 border border-health-primary/20 text-health-primary text-[10px] font-bold uppercase tracking-widest">
+            <ShieldCheck size={12} />
             Developer Console
           </div>
-          <h1 className="text-4xl font-heading font-bold">API <span className="text-gradient">Access</span></h1>
-          <p className="text-white/50 max-w-2xl">
-            Integrate HexaGene's S21 scoring engine directly into your clinical workflows and applications.
+          <h1 className="text-4xl font-heading font-black text-health-text">API <span className="text-health-primary">Access</span></h1>
+          <p className="text-health-muted max-w-2xl leading-relaxed">
+            Manage your secure access credentials for the Exagin S21 engine. 
+            Keep your API keys private and never expose them in client-side code.
           </p>
         </div>
         
-        <div className="flex gap-4">
-          <div className="glass-card px-4 py-2 flex items-center gap-3 border-hexa-success/20">
-            <div className="w-2 h-2 rounded-full bg-hexa-success animate-pulse" />
-            <span className="text-xs font-bold text-hexa-success uppercase tracking-widest">Production Ready</span>
-          </div>
-        </div>
+        <button 
+          onClick={generateKey}
+          disabled={generating}
+          className="btn-health-primary px-8 py-4"
+        >
+          {generating ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+          <span>Generate New API Key</span>
+        </button>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm animate-fade-in">
+          <ShieldAlert size={18} />
+          <span className="font-bold">{error}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* LEFT COL: CONTENT */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* TABS */}
-          <div className="flex gap-2 p-1 bg-white/5 rounded-xl w-fit border border-white/5">
-            {[
-              { id: 'keys', label: 'API Keys', icon: <Key size={14} /> },
-              { id: 'docs', label: 'Integration', icon: <Terminal size={14} /> },
-              { id: 'usage', label: 'Usage & Limits', icon: <Activity size={14} /> },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all
-                  ${activeTab === tab.id ? 'bg-hexa-primary text-white shadow-lg' : 'text-white/40 hover:text-white/70'}
-                `}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
+        {/* API KEYS TABLE */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="health-card overflow-hidden">
+            <div className="p-6 border-b border-health-border bg-white flex items-center justify-between">
+              <h3 className="text-lg font-bold text-health-text">Active Credentials</h3>
+              <div className="text-[10px] font-black uppercase tracking-widest text-health-muted">
+                {keys.length} Keys Managed
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-health-surface/50 border-b border-health-border">
+                  <tr>
+                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-health-muted">Key ID / Preview</th>
+                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-health-muted">Status</th>
+                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-health-muted">Created</th>
+                    <th className="p-4 text-[10px] font-black uppercase tracking-widest text-health-muted text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-health-border">
+                  {loading ? (
+                    Array(3).fill(0).map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td colSpan={4} className="p-6"><div className="h-4 bg-health-surface rounded w-full" /></td>
+                      </tr>
+                    ))
+                  ) : keys.length > 0 ? (
+                    keys.map((key) => (
+                      <tr key={key.id} className="hover:bg-health-surface/30 transition-colors">
+                        <td className="p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <code className="text-xs font-mono font-bold bg-health-surface px-2 py-1 rounded text-health-text">
+                                {showKeyId === key.id ? key.key : `${key.key.substring(0, 12)}••••••••••••`}
+                              </code>
+                              <button 
+                                onClick={() => toggleKeyVisibility(key.id)}
+                                className="p-1.5 hover:bg-health-surface rounded transition-colors text-health-muted"
+                                title="Toggle Visibility"
+                              >
+                                {showKeyId === key.id ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-health-muted font-medium ml-1">SHA-256 Protocol Activated</p>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 text-health-primary text-[10px] font-black uppercase">
+                            <CheckCircle size={10} /> Active
+                          </span>
+                        </td>
+                        <td className="p-4 text-xs font-medium text-health-muted italic">
+                          {new Date(key.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-4 text-right space-x-2">
+                          <button 
+                            onClick={() => copyToClipboard(key.key, key.id)}
+                            className="btn-health-outline py-2 px-3 text-[10px] uppercase"
+                          >
+                            {copyStatus === key.id ? "Copied" : <><Copy size={12} className="inline mr-1" /> Copy</>}
+                          </button>
+                          <button 
+                            onClick={() => deleteKey(key.id)}
+                            className="py-2 px-3 text-[10px] uppercase font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            Revoke
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="p-12 text-center text-health-muted">
+                        No API keys generated. Create one to start integrating.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {activeTab === 'keys' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="glass-card p-0 border-white/5 overflow-hidden">
-                <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-hexa-primary/10 rounded-lg text-hexa-primary">
-                      <Lock size={18} />
-                    </div>
-                    <div>
-                      <h3 className="font-heading font-bold">Secret Keys</h3>
-                      <p className="text-xs text-white/40">Manage keys used for authenticated server-side requests</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={handleGenerate}
-                    disabled={generating}
-                    className="btn-premium flex items-center gap-2 py-2.5 px-4 text-xs"
-                  >
-                    {generating ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />}
-                    Create New Key
-                  </button>
+          <div className="health-card p-8 space-y-6">
+            <h3 className="text-lg font-bold text-health-text flex items-center gap-3">
+              <Terminal size={22} className="text-health-primary" />
+              Quick Integration
+            </h3>
+            
+            <div className="space-y-4">
+              <p className="text-xs text-health-muted leading-relaxed">
+                Use your API key as a Bearer token or in the <code className="bg-health-surface px-1.5 py-0.5 rounded text-health-primary">x-api-key</code> header to authenticate diagnostic requests.
+              </p>
+              
+              <div className="bg-health-text p-6 rounded-2xl font-mono text-xs overflow-x-auto relative group">
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button className="text-white/40 hover:text-white"><Copy size={16} /></button>
                 </div>
-
-                <div className="p-6 space-y-4">
-                  {generateError && (
-                    <div className="p-3 bg-hexa-danger/10 border border-hexa-danger/20 rounded-xl text-hexa-danger text-xs flex items-center gap-2">
-                      <AlertTriangle size={14} /> {generateError}
-                    </div>
-                  )}
-
-                  {generatedKey && (
-                    <div className="p-6 bg-hexa-success/5 border border-hexa-success/20 rounded-2xl space-y-4 animate-in zoom-in-95 duration-500">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-hexa-success font-bold text-xs">
-                          <CheckCircle size={14} /> New key generated successfully
-                        </div>
-                        <button onClick={() => setGeneratedKey("")} className="text-white/20 hover:text-white">
-                          <EyeOff size={14} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-black/40 rounded-xl border border-white/5">
-                        <code className="text-lg text-hexa-primary font-mono flex-1 break-all">{generatedKey}</code>
-                        <button 
-                          onClick={() => handleCopy(generatedKey)}
-                          className="p-2 bg-hexa-primary/20 text-hexa-primary rounded-lg hover:bg-hexa-primary/30 transition-colors"
-                        >
-                          {copied ? "Copied!" : <Copy size={18} />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-white/40 leading-relaxed">
-                        <span className="text-hexa-warning font-bold">CRITICAL:</span> Save this key now. For security, we won't show it again. You can't recover it once you refresh this page.
-                      </p>
-                    </div>
-                  )}
-
-                  {loading ? (
-                    <div className="flex items-center justify-center py-12 text-white/20">
-                      <Loader2 size={32} className="animate-spin" />
-                    </div>
-                  ) : keys.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3">
-                      {keys.map((k) => (
-                        <div key={k.id} className="group p-4 bg-white/[0.03] border border-white/5 rounded-xl flex items-center justify-between hover:bg-white/[0.05] transition-all">
-                          <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-white/5 rounded-lg text-white/40 group-hover:text-hexa-primary transition-colors">
-                              <Key size={16} />
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm text-white/80">Stored Hash (SHA-256)</span>
-                                <div className="px-2 py-0.5 rounded bg-hexa-primary/10 text-hexa-primary text-[10px] font-bold uppercase tracking-tighter italic">Active</div>
-                              </div>
-                              <p className="text-[10px] text-white/30">Created on {new Date(k.created_at).toLocaleDateString()} • ID: {k.id.slice(0, 8)}</p>
-                            </div>
-                          </div>
-                          
-                          <button 
-                            onClick={() => handleRevoke(k.id)}
-                            className={`
-                              px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
-                              ${confirmDeleteId === k.id ? 'bg-hexa-danger text-white' : 'bg-white/5 text-white/30 hover:bg-hexa-danger/10 hover:text-hexa-danger'}
-                            `}
-                          >
-                            {confirmDeleteId === k.id ? 'Confirm Revoke' : 'Revoke'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-white/20 border-2 border-dashed border-white/5 rounded-2xl">
-                      <Key size={48} className="mb-4 opacity-10" />
-                      <p className="text-sm">No active API keys found</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="glass-card p-6 border-hexa-accent/20 bg-hexa-accent/5">
-                <div className="flex items-start gap-4">
-                  <div className="p-2 bg-hexa-accent/10 rounded-lg text-hexa-accent">
-                    <Info size={18} />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-bold">Key Security Standards</h4>
-                    <p className="text-xs text-white/50 leading-relaxed">
-                      We use SHA-256 hashing to store your keys. We never store the raw key in our database, ensuring that even in a breach, your actual credentials remain secure.
-                    </p>
-                  </div>
+                <div className="text-white/90 space-y-1">
+                  <p><span className="text-health-primary">curl</span> -X POST "https://api.exagin.com/v2/score" \</p>
+                  <p className="pl-4">-H <span className="text-orange-400">"x-api-key: YOUR_KEY"</span> \</p>
+                  <p className="pl-4">-H <span className="text-orange-400">"Content-Type: application/json"</span> \</p>
+                  <p className="pl-4">-d <span className="text-emerald-400">'{ "biomarkers": { "crp": 1.2 } }'</span></p>
                 </div>
               </div>
             </div>
-          )}
-
-          {activeTab === 'docs' && (
-            <div className="space-y-8 animate-fade-in">
-              <div className="space-y-4">
-                <h3 className="text-lg font-heading font-bold">Quick Start Guide</h3>
-                <p className="text-sm text-white/50 leading-relaxed">
-                  Authenticate your requests by including your secret key in the <code className="text-hexa-primary">x-api-key</code> header.
-                </p>
-                
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-white/30">cURL Example</h4>
-                    <CodeBlock 
-                      lang="shell"
-                      code={`curl -X POST "${API_URL}/v2/score" \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "patient_data": {
-      "crp": 1.2,
-      "hba1c": 5.4,
-      "albumin": 4.1
-    }
-  }'`}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-white/30">Node.js Example</h4>
-                    <CodeBlock 
-                      lang="javascript"
-                      code={`const response = await fetch("${API_URL}/v2/score", {
-  method: "POST",
-  headers: {
-    "x-api-key": "YOUR_API_KEY",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    patient_data: { crp: 1.2, hba1c: 5.4 }
-  })
-});
-
-const data = await response.json();
-console.log(data.position.risk_score);`}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/5 rounded-xl">
-                    <Globe size={24} className="text-white/40" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold">Full API Documentation</h4>
-                    <p className="text-xs text-white/40">Explore interactive Swagger & Redoc specs</p>
-                  </div>
-                </div>
-                <button className="p-3 bg-white/5 rounded-xl hover:bg-hexa-primary/20 hover:text-hexa-primary transition-all">
-                  <ExternalLink size={20} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'usage' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { label: 'Requests (Today)', value: '142', limit: '50,000', color: 'primary' },
-                  { label: 'Burst Rate', value: '3/sec', limit: '10/sec', color: 'accent' },
-                  { label: 'Compute Time', value: '84ms', limit: 'Avg', color: 'success' },
-                ].map((m) => (
-                  <div key={m.label} className="glass-card p-6 border-white/5 space-y-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">{m.label}</p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-black">{m.value}</span>
-                      <span className="text-[10px] text-white/20">/ {m.limit}</span>
-                    </div>
-                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div className={`h-full bg-hexa-${m.color} rounded-full`} style={{ width: '15%' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="glass-card p-8 border-white/5 space-y-6">
-                <h4 className="font-heading font-bold">Rate Limiting Policy</h4>
-                <div className="space-y-4">
-                  {[
-                    { title: 'Standard Requests', desc: 'Up to 20 requests per minute with a burst of 3 per 2 seconds.' },
-                    { title: 'Concurrent Jobs', desc: 'Unlimited parallel scoring operations within rate boundaries.' },
-                    { title: 'Quota Exceeded', desc: 'API returns HTTP 429 Too Many Requests when limits are breached.' },
-                  ].map((item) => (
-                    <div key={item.title} className="flex gap-4">
-                      <div className="w-1.5 h-1.5 rounded-full bg-hexa-primary mt-1.5 flex-shrink-0" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold">{item.title}</p>
-                        <p className="text-xs text-white/40 leading-relaxed">{item.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* RIGHT COL: SIDEBAR */}
-        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-28">
-          <div className="glass-card p-8 border-hexa-secondary/20 bg-gradient-to-br from-hexa-card to-hexa-secondary/5">
-            <h4 className="text-sm font-bold mb-6 flex items-center gap-2">
-              <Zap size={18} className="text-hexa-secondary" />
-              Upgrade Tier
-            </h4>
-            <p className="text-xs text-white/50 leading-relaxed mb-8">
-              Need higher rate limits or dedicated infrastructure? Explore our Enterprise solutions.
-            </p>
-            <ul className="space-y-4 mb-10">
+        {/* SIDEBAR HELP */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="health-card p-6 bg-health-surface border-none space-y-4">
+            <div className="p-3 bg-white w-12 h-12 rounded-xl flex items-center justify-center text-health-primary shadow-sm">
+              <Lock size={24} />
+            </div>
+            <h4 className="text-sm font-bold text-health-text">Security Best Practices</h4>
+            <ul className="space-y-3">
               {[
-                'Unlimited Requests',
-                'Dedicated S21 Engine',
-                'HIPAA Compliance',
-                '24/7 Support SLA'
-              ].map((f) => (
-                <li key={f} className="flex items-center gap-3 text-[10px] font-bold text-white/70">
-                  <ShieldCheck size={14} className="text-hexa-secondary" />
-                  {f}
+                "Never share your API keys publicly",
+                "Rotate keys every 90 days for safety",
+                "Use environment variables (.env)",
+                "Revoke compromised keys immediately"
+              ].map((text, i) => (
+                <li key={i} className="flex items-start gap-3 text-xs text-health-muted leading-tight">
+                  <div className="w-1.5 h-1.5 rounded-full bg-health-primary mt-1 flex-shrink-0" />
+                  {text}
                 </li>
               ))}
             </ul>
-            <button className="w-full btn-premium !bg-gradient-to-r from-hexa-secondary to-hexa-primary py-4">
-              Contact Sales
-            </button>
           </div>
 
-          <div className="glass-card p-6 border-white/5 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">Quick Links</h4>
-            <div className="space-y-2">
-              {[
-                'GitHub Repository',
-                'Stack Overflow Support',
-                'System Status',
-                'Discord Developer Hub'
-              ].map((link) => (
-                <button key={link} className="w-full flex items-center justify-between p-2 hover:bg-white/5 rounded-lg text-xs transition-colors text-left">
-                  <span>{link}</span>
-                  <ChevronRight size={14} className="opacity-40" />
+          <div className="health-card p-8 space-y-6">
+            <h4 className="text-xs font-black uppercase tracking-widest text-health-muted">Diagnostic SDKs</h4>
+            <div className="space-y-3">
+              {['Node.js', 'Python', 'React Native', 'Go'].map(sdk => (
+                <button key={sdk} className="w-full flex items-center justify-between p-4 bg-white border border-health-border rounded-xl text-xs font-bold hover:border-health-primary transition-all group">
+                  {sdk} SDK
+                  <ChevronRight size={14} className="text-health-muted group-hover:text-health-primary" />
                 </button>
               ))}
             </div>
+            <button className="w-full text-center text-[10px] font-black uppercase tracking-widest text-health-primary hover:underline">
+              View All SDKs
+            </button>
+          </div>
+
+          <div className="p-6 bg-white border border-health-border rounded-2xl flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-health-primary">
+              <Globe size={18} />
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-health-text">API Status</p>
+              <p className="text-[10px] text-health-primary font-black uppercase">All Systems Online</p>
+            </div>
+            <ArrowUpRight size={16} className="ml-auto text-health-muted" />
           </div>
         </div>
       </div>

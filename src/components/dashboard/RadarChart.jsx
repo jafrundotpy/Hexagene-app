@@ -8,17 +8,15 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const RadarChart = ({ data, color = '#22d3ee' }) => {
-  // Expected data format: [{ axis: 'Structural', value: 80 }, ...]
-  
+const RadarChart = ({ data, color = '#22C55E' }) => {
   return (
     <div className="w-full h-full min-h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <ReRadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
-          <PolarGrid stroke="rgba(255,255,255,0.05)" />
+          <PolarGrid stroke="#E5E7EB" />
           <PolarAngleAxis 
             dataKey="axis" 
-            tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600 }} 
+            tick={{ fill: '#6B7280', fontSize: 11, fontWeight: 600 }} 
           />
           <PolarRadiusAxis 
             angle={30} 
@@ -31,9 +29,9 @@ const RadarChart = ({ data, color = '#22d3ee' }) => {
             dataKey="value"
             stroke={color}
             fill={color}
-            fillOpacity={0.15}
-            strokeWidth={2}
-            animationDuration={1500}
+            fillOpacity={0.1}
+            strokeWidth={3}
+            animationDuration={1000}
           />
         </ReRadarChart>
       </ResponsiveContainer>
