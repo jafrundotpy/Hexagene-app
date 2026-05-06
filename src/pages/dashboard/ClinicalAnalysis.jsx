@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { 
   Activity, 
   FlaskConical, 
@@ -16,10 +16,17 @@ import {
   Zap,
   Info,
   FileText,
-  Upload
+  Upload,
+  FileSearch,
+  Loader2
 } from "lucide-react";
+import { useDropzone } from "react-dropzone";
+import * as pdfjs from "pdfjs-dist";
 import API_URL from "../../api/config";
 import MetricCard from "../../components/dashboard/MetricCard";
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const DRUG_LIST = [
   "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
@@ -29,21 +36,47 @@ const DRUG_LIST = [
   "Codeine", "Levothyroxine"
 ];
 
+const LAB_MARKERS = [
+  { label: "Albumin (g/dL)", name: "albumin", icon: <Droplets size={16} />, group: "Core Metabolic" },
+  { label: "HbA1c (%)", name: "hba1c", icon: <Activity size={16} />, group: "Core Metabolic" },
+  { label: "Glucose (mg/dL)", name: "glucose", icon: <Activity size={16} />, group: "Core Metabolic" },
+  { label: "Uric Acid (mg/dL)", name: "uric_acid", icon: <Droplets size={16} />, group: "Core Metabolic" },
+  { label: "Creatinine (mg/dL)", name: "creatinine", icon: <Activity size={16} />, group: "Core Metabolic" },
+  { label: "eGFR", name: "egfr", icon: <Dna size={16} />, group: "Core Metabolic" },
+  
+  { label: "CRP (mg/L)", name: "crp", icon: <Heart size={16} />, group: "Inflammatory" },
+  { label: "RDW (%)", name: "rdw", icon: <Activity size={16} />, group: "Inflammatory" },
+  { label: "NLR", name: "nlr", icon: <Activity size={16} />, group: "Inflammatory" },
+  
+  { label: "Triglycerides", name: "triglycerides", icon: <Droplets size={16} />, group: "Lipids" },
+  { label: "HDL Cholesterol", name: "hdl", icon: <Heart size={16} />, group: "Lipids" },
+  { label: "LDL Cholesterol", name: "ldl", icon: <Heart size={16} />, group: "Lipids" },
+  
+  { label: "Hemoglobin", name: "hemoglobin", icon: <Activity size={16} />, group: "Hematology" },
+  { label: "WBC Count", name: "wbc", icon: <Activity size={16} />, group: "Hematology" },
+  { label: "Platelets", name: "platelets", icon: <Activity size={16} />, group: "Hematology" },
+  
+  { label: "ALT (U/L)", name: "alt", icon: <Droplets size={16} />, group: "Organ Function" },
+  { label: "AST (U/L)", name: "ast", icon: <Droplets size={16} />, group: "Organ Function" },
+  { label: "TSH (mIU/L)", name: "tsh", icon: <Zap size={16} />, group: "Organ Function" },
+  { label: "Ferritin (ng/mL)", name: "ferritin", icon: <Zap size={16} />, group: "Organ Function" },
+];
+
 const ClinicalAnalysis = () => {
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [results, setResults] = useState(null);
 
   const [form, setForm] = useState({
     age: "45",
-    sex: "0", // 0=Male, 1=Female
+    sex: "0",
     labs: {
-      albumin: "4.2",
-      crp: "1.5",
-      hba1c: "5.4",
-      egfr: "95",
-      rdw: "12.8",
-      uric_acid: "5.2"
+      albumin: "", crp: "", hba1c: "", egfr: "", rdw: "", uric_acid: "",
+      hemoglobin: "", triglycerides: "", hdl: "", ldl: "",
+      creatinine: "", glucose: "", tsh: "", ferritin: "",
+      wbc: "", platelets: "", alt: "", ast: "", nlr: ""
     },
     medications: [],
     raw_23andme: ""
@@ -63,23 +96,104 @@ const ClinicalAnalysis = () => {
     setForm({ ...form, medications: newMeds });
   };
 
+  const extractTextFromPDF = async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item) => item.str).join(" ");
+      fullText += pageText + "\n";
+    }
+    return fullText;
+  };
+
+  const onDrop = useCallback(async (acceptedFiles) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File size exceeds 5MB limit.");
+      return;
+    }
+
+    setExtracting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const text = await extractTextFromPDF(file);
+      
+      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+      
+      const prompt = `Extract lab values from this medical report. Return ONLY JSON:\n{\n"albumin": number or null,\n"crp": number or null,\n"hba1c": number or null,\n"egfr": number or null,\n"rdw": number or null,\n"uric_acid": number or null,\n"hemoglobin": number or null,\n"triglycerides": number or null,\n"hdl": number or null,\n"ldl": number or null,\n"creatinine": number or null,\n"glucose": number or null,\n"tsh": number or null,\n"ferritin": number or null,\n"wbc": number or null,\n"platelets": number or null,\n"alt": number or null,\n"ast": number or null,\n"nlr": number or null\n}\n\nReport Text:\n${text}`;
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "HexaGene Clinical Analysis"
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.0-flash-exp:free",
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+
+      if (!response.ok) throw new Error("Extraction failed");
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      
+      // Clean potential markdown blocks
+      const jsonStr = content.replace(/```json|```/g, "").trim();
+      const extractedLabs = JSON.parse(jsonStr);
+
+      setForm(prev => ({
+        ...prev,
+        labs: {
+          ...prev.labs,
+          ...Object.fromEntries(
+            Object.entries(extractedLabs).map(([k, v]) => [k, v === null ? "" : String(v)])
+          )
+        }
+      }));
+      setSuccess("Lab values extracted successfully!");
+    } catch (err) {
+      setError("Failed to extract lab values. Please enter them manually.");
+      console.error(err);
+    } finally {
+      setExtracting(false);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "application/pdf": [".pdf"] },
+    multiple: false
+  });
+
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
-      const apiKey = "merlin123merlin123"; // Project API key
+      const apiKey = "merlin123merlin123";
       const headers = {
         "Content-Type": "application/json",
         "x-api-key": apiKey
       };
 
-      // STEP 1: Intake
       const intakePayload = {
         demographics: {
           age: parseInt(form.age),
           sex: parseInt(form.sex)
         },
-        labs: form.labs,
+        labs: Object.fromEntries(
+          Object.entries(form.labs).filter(([_, v]) => v !== "").map(([k, v]) => [k, v])
+        ),
         medications: form.medications,
         raw_23andme: form.raw_23andme
       };
@@ -92,7 +206,6 @@ const ClinicalAnalysis = () => {
       if (!intakeRes.ok) throw new Error("Intake failed");
       const intakeData = await intakeRes.json();
 
-      // STEP 2: Score
       const scoreRes = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
         headers,
@@ -101,7 +214,6 @@ const ClinicalAnalysis = () => {
       if (!scoreRes.ok) throw new Error("Scoring failed");
       const scoreData = await scoreRes.json();
 
-      // STEP 3: Report (Enrichment)
       const reportRes = await fetch(`${API_URL}/v2/report`, {
         method: "POST",
         headers,
@@ -155,7 +267,7 @@ const ClinicalAnalysis = () => {
         
         <button 
           onClick={handleAnalyze}
-          disabled={loading}
+          disabled={loading || extracting}
           className="btn-health-primary px-10 py-5 shadow-xl shadow-health-primary/20 hover:scale-105 active:scale-95 transition-all"
         >
           {loading ? <RefreshCw size={20} className="animate-spin" /> : <FlaskConical size={20} />}
@@ -163,10 +275,12 @@ const ClinicalAnalysis = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-sm font-bold flex items-center gap-3 animate-fade-in">
-          <ShieldAlert size={20} />
-          {error}
+      {(error || success) && (
+        <div className={`p-4 rounded-2xl border text-sm font-bold flex items-center gap-3 animate-fade-in ${
+          error ? 'bg-red-50 border-red-100 text-red-600' : 'bg-green-50 border-green-100 text-green-600'
+        }`}>
+          {error ? <ShieldAlert size={20} /> : <CheckCircle size={20} />}
+          {error || success}
         </div>
       )}
 
@@ -205,34 +319,70 @@ const ClinicalAnalysis = () => {
             </div>
           </div>
 
+          {/* PDF UPLOAD BOX */}
+          <div className="health-card p-8 border-t-4 border-t-purple-600 bg-purple-50/30">
+            <h3 className="text-lg font-bold text-health-text mb-4 flex items-center gap-3">
+              <FileSearch className="text-purple-600" size={22} />
+              Auto-Extract Labs
+            </h3>
+            <div 
+              {...getRootProps()} 
+              className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
+                isDragActive ? 'border-purple-500 bg-purple-100' : 'border-purple-200 hover:border-purple-400 hover:bg-purple-50'
+              }`}
+            >
+              <input {...getInputProps()} />
+              <div className="flex flex-col items-center gap-3">
+                {extracting ? (
+                  <>
+                    <Loader2 size={32} className="text-purple-600 animate-spin" />
+                    <p className="text-sm font-bold text-purple-700 animate-pulse">Extracting lab values...</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                      <FileText size={24} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-health-text">📄 Upload Lab Report (PDF)</p>
+                      <p className="text-[10px] text-health-muted uppercase tracking-widest font-black">[Choose PDF] Max 5MB</p>
+                      <p className="text-[9px] text-purple-500/70 font-medium">Supported: PDF files only</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* LABS */}
           <div className="health-card p-8 border-t-4 border-t-green-500">
             <h3 className="text-lg font-bold text-health-text mb-6 flex items-center gap-3">
               <ClipboardList className="text-green-500" size={22} />
               Laboratory Markers
             </h3>
-            <div className="space-y-5">
-              {[
-                { label: "Albumin (g/dL)", name: "albumin", icon: <Droplets size={16} /> },
-                { label: "CRP (mg/L)", name: "crp", icon: <Heart size={16} /> },
-                { label: "HbA1c (%)", name: "hba1c", icon: <Activity size={16} /> },
-                { label: "eGFR", name: "egfr", icon: <Dna size={16} /> },
-                { label: "RDW (%)", name: "rdw", icon: <Activity size={16} /> },
-                { label: "Uric Acid (mg/dL)", name: "uric_acid", icon: <Droplets size={16} /> },
-              ].map((field) => (
-                <div key={field.name} className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-health-muted ml-1">{field.label}</label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-health-muted/30">
-                      {field.icon}
-                    </div>
-                    <input 
-                      type="text" 
-                      name={field.name}
-                      value={form.labs[field.name]}
-                      onChange={handleLabChange}
-                      className="input-health w-full pl-12"
-                    />
+            <div className="space-y-8">
+              {["Core Metabolic", "Inflammatory", "Lipids", "Hematology", "Organ Function"].map((group) => (
+                <div key={group} className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-health-muted border-b border-health-border pb-2">{group}</h4>
+                  <div className="space-y-5">
+                    {LAB_MARKERS.filter(m => m.group === group).map((field) => (
+                      <div key={field.name} className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-health-muted ml-1">{field.label}</label>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-health-muted/30">
+                            {field.icon}
+                          </div>
+                          <input 
+                            type="text" 
+                            name={field.name}
+                            placeholder="---"
+                            value={form.labs[field.name]}
+                            onChange={handleLabChange}
+                            className="input-health w-full pl-12"
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -522,4 +672,4 @@ const ClinicalAnalysis = () => {
   );
 };
 
-export default ClinicalAnalysis
+export default ClinicalAnalysis;
