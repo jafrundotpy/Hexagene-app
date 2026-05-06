@@ -860,10 +860,9 @@ async def extract_labs(file: UploadFile = File(...)):
 
     # Try multiple free models in order of preference
     models = [
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "mistralai/mistral-7b-instruct:free",
-        "qwen/qwen-2.5-7b-instruct:free",
-        "nousresearch/hermes-3-llama-3.1-405b:free",
+        "google/gemma-4-31b-it:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "openrouter/free",
     ]
 
     last_error = "No model available"
