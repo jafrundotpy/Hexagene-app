@@ -127,6 +127,10 @@ const ClinicalAnalysis = () => {
       
       const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
       
+      if (!apiKey) {
+        throw new Error("OpenRouter API Key (VITE_OPENROUTER_API_KEY) is missing from environment.");
+      }
+      
       const prompt = `Extract lab values from this medical report. Return ONLY JSON:\n{\n"albumin": number or null,\n"crp": number or null,\n"hba1c": number or null,\n"egfr": number or null,\n"rdw": number or null,\n"uric_acid": number or null,\n"hemoglobin": number or null,\n"triglycerides": number or null,\n"hdl": number or null,\n"ldl": number or null,\n"creatinine": number or null,\n"glucose": number or null,\n"tsh": number or null,\n"ferritin": number or null,\n"wbc": number or null,\n"platelets": number or null,\n"alt": number or null,\n"ast": number or null,\n"nlr": number or null\n}\n\nReport Text:\n${text}`;
 
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -143,7 +147,11 @@ const ClinicalAnalysis = () => {
         })
       });
 
-      if (!response.ok) throw new Error("Extraction failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Extraction failed with status ${response.status}`);
+      }
+      
       const data = await response.json();
       const content = data.choices[0].message.content;
       
@@ -162,8 +170,8 @@ const ClinicalAnalysis = () => {
       }));
       setSuccess("Lab values extracted successfully!");
     } catch (err) {
-      setError("Failed to extract lab values. Please enter them manually.");
-      console.error(err);
+      console.error("Extraction Error:", err);
+      setError(`Extraction Error: ${err.message}`);
     } finally {
       setExtracting(false);
     }
