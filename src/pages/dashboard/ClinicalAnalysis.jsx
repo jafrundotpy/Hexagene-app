@@ -22,11 +22,12 @@ import {
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import * as pdfjs from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import API_URL from "../../api/config";
 import MetricCard from "../../components/dashboard/MetricCard";
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const DRUG_LIST = [
   "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
