@@ -1,26 +1,25 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { 
   Activity, 
-  Database, 
   Upload, 
   Zap, 
   Heart, 
   Moon, 
   Flame, 
-  Navigation,
   RefreshCw,
   Dna,
   User,
   ShieldAlert,
   Info,
-  ChevronRight,
-  Plus,
   Loader2,
   Stethoscope,
-  ClipboardCheck
+  ClipboardCheck,
+  Droplets,
+  CheckCircle,
+  FileText,
+  AlertCircle
 } from "lucide-react";
 import MetricCard from "../../components/dashboard/MetricCard";
-import RadarChart from "../../components/dashboard/RadarChart";
 import API_URL from "../../api/config";
 
 const Simulations = () => {
@@ -28,20 +27,19 @@ const Simulations = () => {
   const [uploading, setUploading] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
   const [dragOver, setDragOver] = useState(false);
-  const [riskScore, setRiskScore] = useState(null);
-  const [analysisData, setAnalysisData] = useState(null);
-  const [analysisRun, setAnalysisRun] = useState(false);
+  const [results, setResults] = useState(null);
   const fileRef = useRef();
 
   const [form, setForm] = useState({
-    age: "", sex: "", albumin: "", crp: "", hba1c: "",
-    egfr: "", rdw: "", uricAcid: "", restingHR: "", dailySteps: "", 
-    activeMinutes: "", hrv: "", calories: "", sleepDuration: "", 
-    oxygen: "", stress: ""
+    age: "35", sex: "0", hba1c: "5.4", uricAcid: "5.2",
+    restingHR: "62", dailySteps: "8500", 
+    activeMinutes: "45", hrv: "55", calories: "2400", 
+    sleepDuration: "7.5", oxygen: "98", stress: "28"
   });
 
   const updateField = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
+  // PRESERVED: Wearable Sync Logic
   const handleSyncWearable = async () => {
     try {
       setLoading(true);
@@ -90,6 +88,7 @@ const Simulations = () => {
     }
   };
 
+  // PRESERVED: OCR Feature
   const handleFileUpload = async (file) => {
     if (!file) return;
     try {
@@ -131,32 +130,26 @@ const Simulations = () => {
 
     try {
       setLoading(true);
-      setStatusMsg("Calculating health score...");
+      setStatusMsg("Calculating Boss Health Score...");
       
-      const token = localStorage.getItem("token");
-      let userId = "demo-user";
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          if (payload.id) userId = payload.id;
-        } catch (e) {}
-      }
-
+      // Format input for Boss /v2/score
       const payload = {
-        user_id: userId,
         age: parseInt(form.age),
-        sex: form.sex,
-        daily_steps: parseFloat(form.dailySteps) || 0,
-        resting_heart_rate: parseFloat(form.restingHR) || 0,
-        avg_sleep_hours: parseFloat(form.sleepDuration) || 0,
-        hrv: parseFloat(form.hrv) || 0,
-        stress_score: parseFloat(form.stress) || 0,
-        spo2: parseFloat(form.oxygen) || 0,
-        calories_burned: parseFloat(form.calories) || 0,
-        active_minutes: parseFloat(form.activeMinutes) || 0,
+        sex: parseInt(form.sex),
+        blood: {
+          hba1c: parseFloat(form.hba1c) || 5.4,
+          uric_acid: parseFloat(form.uricAcid) || 5.2
+        },
+        wearables: {
+          steps: parseFloat(form.dailySteps) || 0,
+          hr: parseFloat(form.restingHR) || 0,
+          sleep: parseFloat(form.sleepDuration) || 0,
+          hrv: parseFloat(form.hrv) || 0,
+          spo2: parseFloat(form.oxygen) || 0,
+        }
       };
 
-      const response = await fetch(`${API_URL}/v2/score-from-wearable`, {
+      const response = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -165,29 +158,33 @@ const Simulations = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error("Analysis engine error");
+      if (!response.ok) throw new Error("Boss engine error");
       const data = await response.json();
-
-      const pos = data.position || data;
-      if (pos?.axes) {
-        const mappedAxes = [
-          { axis: 'Structural', value: (pos.axes.structural || 0) * 100 },
-          { axis: 'Inflammatory', value: (pos.axes.inflammatory || 0) * 100 },
-          { axis: 'Metabolic', value: (pos.axes.metabolic || 0) * 100 },
-          { axis: 'Redox', value: (pos.axes.redox || 0) * 100 },
-          { axis: 'Kinetic', value: (pos.axes.kinetic || 0) * 100 },
-          { axis: 'Balance', value: (pos.axes.balance || 0) * 100 },
-        ];
-        setAnalysisData({ ...data, radarData: mappedAxes });
-        setRiskScore(pos.risk_score !== undefined ? Math.round(pos.risk_score * 100) : 50);
-        setAnalysisRun(true);
-        setStatusMsg(null);
-      }
+      setResults(data);
+      setStatusMsg(null);
     } catch (err) {
       setStatusMsg("❌ Analysis failed: " + err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderAxisBar = (label, value) => {
+    const percent = Math.round(value * 100);
+    return (
+      <div key={label} className="space-y-1">
+        <div className="flex justify-between items-end">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-health-muted">{label}</span>
+          <span className="text-[10px] font-black text-health-text">{percent}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-health-surface rounded-full overflow-hidden border border-health-border">
+          <div 
+            className={`h-full transition-all duration-1000 ${percent > 70 ? 'bg-red-500' : percent > 40 ? 'bg-orange-500' : 'bg-health-primary'}`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      </div>
+    );
   };
 
   const inputGroup = (title, icon, fields, colorClass) => (
@@ -227,8 +224,7 @@ const Simulations = () => {
           </div>
           <h1 className="text-4xl font-heading font-black text-health-text">Health <span className="text-health-primary">Simulation</span></h1>
           <p className="text-health-muted max-w-2xl leading-relaxed">
-            Adjust your biometric markers to simulate clinical outcomes and overall health scoring.
-            Connect sensors for live data or upload medical reports.
+            Adjust your biometric markers to simulate clinical outcomes based on the Boss S21 engine.
           </p>
         </div>
         
@@ -247,7 +243,7 @@ const Simulations = () => {
             className="btn-health-primary flex items-center gap-2 px-8"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <ClipboardCheck size={18} />}
-            <span>Run Analysis</span>
+            <span>Run Boss Score</span>
           </button>
         </div>
       </div>
@@ -268,7 +264,7 @@ const Simulations = () => {
         {/* LEFT COLUMN: INPUTS */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* UPLOAD SECTION */}
+          {/* PRESERVED: UPLOAD SECTION */}
           <div 
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -294,12 +290,12 @@ const Simulations = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {inputGroup("Patient Basics", <User />, [
               { label: "Age", key: "age", placeholder: "35" },
-              { label: "Sex", key: "sex", placeholder: "M/F" }
+              { label: "Sex (0=M, 1=F)", key: "sex", placeholder: "0" }
             ], "bg-blue-50 text-blue-600")}
             
             {inputGroup("Clinical Lab", <Heart />, [
-              { label: "CRP (mg/L)", key: "crp", placeholder: "1.2" },
-              { label: "HbA1c (%)", key: "hba1c", placeholder: "5.4" }
+              { label: "HbA1c (%)", key: "hba1c", placeholder: "5.4" },
+              { label: "Uric Acid", key: "uricAcid", placeholder: "5.2" }
             ], "bg-red-50 text-red-600")}
 
             {inputGroup("Readiness", <Zap />, [
@@ -329,83 +325,85 @@ const Simulations = () => {
           
           <div className="health-card p-8 bg-white overflow-hidden relative border-t-4 border-t-health-primary">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-bold text-health-text">Analysis Results</h3>
-              <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${analysisRun ? 'bg-green-100 text-health-primary' : 'bg-gray-100 text-gray-400'}`}>
-                {analysisRun ? 'Finalized' : 'Draft'}
+              <h3 className="text-xl font-bold text-health-text">Simulation Results</h3>
+              <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${results ? 'bg-green-100 text-health-primary' : 'bg-gray-100 text-gray-400'}`}>
+                {results ? 'Boss Powered' : 'Awaiting Data'}
               </div>
             </div>
 
-            {analysisRun ? (
+            {results ? (
               <div className="space-y-10 animate-fade-in">
+                
+                {/* 1. RISK SCORE */}
                 <div className="flex flex-col items-center text-center">
-                  <div className="relative w-48 h-48 flex items-center justify-center">
+                  <div className="relative w-40 h-40 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
                       <circle cx="50" cy="50" r="45" className="stroke-health-surface fill-none" strokeWidth="6" />
                       <circle 
                         cx="50" cy="50" r="45" 
-                        className={`fill-none transition-all duration-1000 ${riskScore > 70 ? 'stroke-red-500' : riskScore > 40 ? 'stroke-orange-500' : 'stroke-health-primary'}`} 
+                        className={`fill-none transition-all duration-1000 ${results.position.risk_score > 0.7 ? 'stroke-red-500' : results.position.risk_score > 0.4 ? 'stroke-orange-500' : 'stroke-health-primary'}`} 
                         strokeWidth="10" 
                         strokeDasharray="283" 
-                        strokeDashoffset={283 - (283 * riskScore) / 100}
+                        strokeDashoffset={283 - (283 * results.position.risk_score)}
                         strokeLinecap="round"
                       />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-5xl font-black tracking-tighter text-health-text">{riskScore}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-health-muted mt-1">Health Score</span>
+                      <span className="text-4xl font-black text-health-text">{Math.round(results.position.risk_score * 100)}</span>
+                      <span className="text-[8px] font-bold uppercase tracking-widest text-health-muted">Risk Score</span>
                     </div>
                   </div>
                   <div className="mt-6 space-y-1">
-                    <p className={`text-lg font-bold ${riskScore > 70 ? 'text-red-600' : riskScore > 40 ? 'text-orange-600' : 'text-health-primary'}`}>
-                      {riskScore > 70 ? 'High Risk Profile' : riskScore > 40 ? 'Moderate Risk Profile' : 'Optimal Health Status'}
+                    <p className={`text-lg font-black uppercase tracking-tight ${results.position.risk_score > 0.7 ? 'text-red-600' : results.position.risk_score > 0.4 ? 'text-orange-600' : 'text-health-primary'}`}>
+                      {results.position.classification} Profile
                     </p>
-                    <p className="text-sm text-health-muted">Diagnostic Classification: {analysisData?.classification || 'Stable'}</p>
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-health-border">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-health-muted mb-8 flex items-center gap-2">
-                    <Activity size={14} className="text-health-primary" />
+                {/* 2. AXES */}
+                <div className="pt-8 border-t border-health-border space-y-6">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-health-muted flex items-center gap-2">
+                    <Zap size={14} className="text-health-primary" />
                     Biological Axis Distribution
                   </h4>
-                  <div className="h-[300px]">
-                    <RadarChart data={analysisData.radarData} />
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                    {renderAxisBar("Structural", results.position.axes.structural)}
+                    {renderAxisBar("Inflammatory", results.position.axes.inflammatory)}
+                    {renderAxisBar("Metabolic", results.position.axes.metabolic)}
+                    {renderAxisBar("Redox", results.position.axes.redox)}
+                    {renderAxisBar("Kinetic", results.position.axes.kinetic)}
+                    {renderAxisBar("Balance", results.position.axes.balance)}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-health-surface rounded-2xl border border-health-border space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-health-muted">Data Confidence</p>
-                    <p className="text-lg font-black text-health-primary">{Math.round((analysisData?.completeness || 0) * 100)}%</p>
-                  </div>
-                  <div className="p-4 bg-health-surface rounded-2xl border border-health-border space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-health-muted">Tier Status</p>
-                    <p className="text-lg font-black text-health-text truncate">{analysisData?.tier || 'Ω₂₁'}</p>
-                  </div>
+                {/* 8. SUMMARY */}
+                <div className="p-5 bg-health-surface rounded-2xl border border-health-border space-y-2">
+                  <p className="text-[11px] font-black text-health-text">{results.clinical.summary.headline}</p>
+                  <p className="text-[10px] text-health-muted leading-relaxed italic line-clamp-3">{results.clinical.summary.body}</p>
                 </div>
+
+                {/* 7. ACTION ITEMS */}
+                <div className="space-y-3">
+                  {results.clinical.action_items.slice(0, 2).map((action, i) => (
+                    <div key={i} className="flex items-center gap-4 p-3 bg-white border border-health-border rounded-xl">
+                      <Info size={16} className="text-health-primary" />
+                      <div className="flex-1">
+                        <p className="text-[9px] font-black text-health-text uppercase">{action.subject}</p>
+                        <p className="text-[8px] text-health-muted truncate">{action.detail}</p>
+                      </div>
+                      <span className="text-[8px] font-bold text-health-primary bg-green-50 px-2 py-0.5 rounded">{action.priority}</span>
+                    </div>
+                  ))}
+                </div>
+
               </div>
             ) : (
               <div className="py-24 flex flex-col items-center text-center space-y-4 opacity-30">
                 <Dna size={64} className="text-health-primary" />
-                <p className="max-w-[200px] text-sm font-bold text-health-text">Adjust biomarkers and run analysis to generate score</p>
+                <p className="max-w-[200px] text-sm font-bold text-health-text">Adjust markers and run analysis to generate score</p>
               </div>
             )}
           </div>
-
-          <div className="health-card p-6 bg-health-surface/50 space-y-4">
-            <h4 className="text-sm font-bold flex items-center gap-2 text-health-text">
-              <Plus size={18} className="text-health-secondary" />
-              Optimization Plan
-            </h4>
-            <p className="text-xs text-health-muted leading-relaxed">
-              Based on the simulated state, the engine recommends prioritizing <span className="text-health-primary font-bold">metabolic stabilization</span> and improved <span className="text-health-secondary font-bold">sleep hygiene</span>.
-            </p>
-            <button className="w-full py-3 bg-white border border-health-border hover:bg-gray-50 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
-              <span>View Detailed Report</span>
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
         </div>
       </div>
     </div>
