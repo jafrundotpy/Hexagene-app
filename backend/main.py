@@ -823,6 +823,91 @@ async def ingest_wearable(payload: WearableIngestRequest):
 def root():
     return {"status": "HexaGene API Running (Production)"}
 
+
+# =====================================================
+# PDF LAB EXTRACTION
+# =====================================================
+
+@app.post("/api/extract-labs")
+async def extract_labs(file: UploadFile = File(...)):
+    """Extract lab values from a PDF medical report using OpenRouter AI."""
+    import io
+
+    OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
+    if not OPENROUTER_KEY:
+        raise HTTPException(status_code=500, detail="OpenRouter API key not configured on server.")
+
+    # Read and parse PDF text
+    try:
+        from pypdf import PdfReader
+        contents = await file.read()
+        reader = PdfReader(io.BytesIO(contents))
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read PDF: {str(e)}")
+
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="PDF appears to be empty or image-based (no extractable text).")
+
+    prompt = (
+        'Extract lab values from this medical report. Return ONLY valid JSON with these exact keys '
+        '(use null if not found):\n'
+        '{"albumin":null,"crp":null,"hba1c":null,"egfr":null,"rdw":null,"uric_acid":null,'
+        '"hemoglobin":null,"triglycerides":null,"hdl":null,"ldl":null,"creatinine":null,'
+        '"glucose":null,"tsh":null,"ferritin":null,"wbc":null,"platelets":null,'
+        '"alt":null,"ast":null,"nlr":null}\n\nReport Text:\n' + text[:6000]
+    )
+
+    # Try multiple free models in order of preference
+    models = [
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "mistralai/mistral-7b-instruct:free",
+        "qwen/qwen-2.5-7b-instruct:free",
+        "nousresearch/hermes-3-llama-3.1-405b:free",
+    ]
+
+    last_error = "No model available"
+    for model in models:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://hexagene-app.onrender.com",
+                        "X-Title": "HexaGene Clinical Analysis",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 512,
+                    }
+                )
+
+            if response.status_code == 200:
+                data = response.json()
+                content = data["choices"][0]["message"]["content"]
+                # Strip markdown code fences if present
+                json_str = re.sub(r"```[a-z]*", "", content).strip().strip("`").strip()
+                labs = json.loads(json_str)
+                return {"success": True, "labs": labs, "model": model}
+            else:
+                err = response.json()
+                last_error = err.get("error", {}).get("message", response.text)
+                logger.warning(f"Model {model} failed: {last_error}")
+                continue
+
+        except json.JSONDecodeError as e:
+            last_error = f"JSON parse error from {model}: {str(e)}"
+            continue
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    raise HTTPException(status_code=503, detail=f"All extraction models unavailable: {last_error}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

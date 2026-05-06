@@ -21,13 +21,8 @@ import {
   Loader2
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import * as pdfjs from "pdfjs-dist";
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import API_URL from "../../api/config";
 import MetricCard from "../../components/dashboard/MetricCard";
-
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const DRUG_LIST = [
   "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
@@ -97,19 +92,6 @@ const ClinicalAnalysis = () => {
     setForm({ ...form, medications: newMeds });
   };
 
-  const extractTextFromPDF = async (file) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item) => item.str).join(" ");
-      fullText += pageText + "\n";
-    }
-    return fullText;
-  };
-
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
     if (!file) return;
@@ -124,41 +106,22 @@ const ClinicalAnalysis = () => {
     setSuccess(null);
 
     try {
-      const text = await extractTextFromPDF(file);
-      
-      const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error("OpenRouter API Key (VITE_OPENROUTER_API_KEY) is missing from environment.");
-      }
-      
-      const prompt = `Extract lab values from this medical report. Return ONLY JSON:\n{\n"albumin": number or null,\n"crp": number or null,\n"hba1c": number or null,\n"egfr": number or null,\n"rdw": number or null,\n"uric_acid": number or null,\n"hemoglobin": number or null,\n"triglycerides": number or null,\n"hdl": number or null,\n"ldl": number or null,\n"creatinine": number or null,\n"glucose": number or null,\n"tsh": number or null,\n"ferritin": number or null,\n"wbc": number or null,\n"platelets": number or null,\n"alt": number or null,\n"ast": number or null,\n"nlr": number or null\n}\n\nReport Text:\n${text}`;
+      // Send PDF directly to backend — OpenRouter is called server-side
+      const formData = new FormData();
+      formData.append("file", file);
 
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await fetch(`${API_URL}/api/extract-labs`, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "HexaGene Clinical Analysis"
-        },
-        body: JSON.stringify({
-          model: "google/gemma-3-27b-it:free",
-          messages: [{ role: "user", content: prompt }]
-        })
+        body: formData,
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `Extraction failed with status ${response.status}`);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server error ${response.status}`);
       }
-      
+
       const data = await response.json();
-      const content = data.choices[0].message.content;
-      
-      // Clean potential markdown blocks
-      const jsonStr = content.replace(/```json|```/g, "").trim();
-      const extractedLabs = JSON.parse(jsonStr);
+      const extractedLabs = data.labs;
 
       setForm(prev => ({
         ...prev,
@@ -169,7 +132,7 @@ const ClinicalAnalysis = () => {
           )
         }
       }));
-      setSuccess("Lab values extracted successfully!");
+      setSuccess(`Lab values extracted successfully!`);
     } catch (err) {
       console.error("Extraction Error:", err);
       setError(`Extraction Error: ${err.message}`);
