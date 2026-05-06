@@ -143,7 +143,7 @@ const ClinicalAnalysis = () => {
           "X-Title": "HexaGene Clinical Analysis"
         },
         body: JSON.stringify({
-          model: "google/gemini-flash-1.5:free",
+          model: "google/gemma-3-27b-it:free",
           messages: [{ role: "user", content: prompt }]
         })
       });
