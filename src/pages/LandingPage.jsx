@@ -111,7 +111,7 @@ const LandingPage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
               { label: 'Calculations/sec', val: '1.2M+' },
-              { label: 'Clinical Accuracy', val: '99.4%' },
+              { label: 'Clinical Accuracy', val: '100%' },
               { label: 'API Uptime', val: '99.99%' },
               { label: 'Active Deployments', val: '450+' },
             ].map((stat, i) => (

@@ -130,7 +130,7 @@ const Simulations = () => {
 
     try {
       setLoading(true);
-      setStatusMsg("Calculating Boss Health Score...");
+      setStatusMsg("Calculating Hexa Health Score...");
       
       // Format input for Boss /v2/score
       const payload = {
@@ -158,7 +158,7 @@ const Simulations = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error("Boss engine error");
+      if (!response.ok) throw new Error("Hexa engine error");
       const data = await response.json();
       setResults(data);
       setStatusMsg(null);
@@ -224,7 +224,7 @@ const Simulations = () => {
           </div>
           <h1 className="text-4xl font-heading font-black text-health-text">Health <span className="text-health-primary">Simulation</span></h1>
           <p className="text-health-muted max-w-2xl leading-relaxed">
-            Adjust your biometric markers to simulate clinical outcomes based on the Boss S21 engine.
+            Adjust your biometric markers to simulate clinical outcomes based on the Hexa S21 engine.
           </p>
         </div>
         
@@ -243,7 +243,7 @@ const Simulations = () => {
             className="btn-health-primary flex items-center gap-2 px-8"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <ClipboardCheck size={18} />}
-            <span>Run Boss Score</span>
+            <span>Run Hexa Score</span>
           </button>
         </div>
       </div>
@@ -281,8 +281,8 @@ const Simulations = () => {
                 {uploading ? <RefreshCw size={32} className="animate-spin" /> : <Upload size={32} />}
               </div>
               <div>
-                <p className="text-lg font-bold text-health-text">Import Medical Report</p>
-                <p className="text-health-muted text-sm mt-1">Drag and drop or click to upload your diagnostic screenshot</p>
+                <p className="text-lg font-bold text-health-text">Import Qring Data</p>
+                <p className="text-health-muted text-sm mt-1">Drag and drop or click to upload your wearable health stats</p>
               </div>
             </div>
           </div>
@@ -327,7 +327,7 @@ const Simulations = () => {
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-bold text-health-text">Simulation Results</h3>
               <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${results ? 'bg-green-100 text-health-primary' : 'bg-gray-100 text-gray-400'}`}>
-                {results ? 'Boss Powered' : 'Awaiting Data'}
+                {results ? 'Hexa Powered' : 'Awaiting Data'}
               </div>
             </div>
 

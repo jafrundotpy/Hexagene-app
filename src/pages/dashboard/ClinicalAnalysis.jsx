@@ -243,7 +243,7 @@ const ClinicalAnalysis = () => {
           className="btn-health-primary px-10 py-5 shadow-xl shadow-health-primary/20 hover:scale-105 active:scale-95 transition-all"
         >
           {loading ? <RefreshCw size={20} className="animate-spin" /> : <FlaskConical size={20} />}
-          <span className="font-bold tracking-tight">Run Boss Analysis</span>
+          <span className="font-bold tracking-tight">Run Hexa Analysis</span>
         </button>
       </div>
 
@@ -414,7 +414,7 @@ const ClinicalAnalysis = () => {
               {/* 1. POSITION SCORE & CLASSIFICATION */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <MetricCard 
-                  title="Boss Risk Score" 
+                  title="Hexa Risk Score" 
                   value={Math.round(results.position.risk_score * 100)} 
                   unit="%"
                   icon={<Activity />}
@@ -634,7 +634,7 @@ const ClinicalAnalysis = () => {
               <h3 className="text-2xl font-black text-health-text mb-3">No Clinical Results Produced</h3>
               <p className="text-health-muted max-w-sm leading-relaxed text-sm">
                 Complete the laboratory, medication, and genetic profiles in the left panel and click 
-                <span className="text-health-primary font-bold"> Run Boss Analysis</span> to generate clinical scoring.
+                <span className="text-health-primary font-bold"> Run Hexa Analysis</span> to generate clinical scoring.
               </p>
             </div>
           )}

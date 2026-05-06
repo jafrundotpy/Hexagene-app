@@ -13,7 +13,7 @@ const Logo = ({ size = 32, showText = true, className = "", onClick }) => {
           style={{ 
             width: size, 
             height: size,
-            background: 'linear-gradient(135deg, #0ea5e9 0%, #22d3ee 100%)' 
+            background: 'linear-gradient(135deg, #22C55E 0%, #10B981 100%)' 
           }}
         />
       </div>
@@ -23,7 +23,7 @@ const Logo = ({ size = 32, showText = true, className = "", onClick }) => {
           className="text-2xl font-bold tracking-tight"
           style={{ 
             fontFamily: '"Times New Roman", Times, serif',
-            color: '#1e40af' // Deep blue matching the logo text
+            color: '#15803d' // Green matching the UI
           }}
         >
           HexaGene

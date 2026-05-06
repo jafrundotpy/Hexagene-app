@@ -136,9 +136,9 @@ const AuthPage = ({ mode = "login" }) => {
 
           <div className="grid grid-cols-1 gap-4">
             {[
-              "ISO 27001 Certified Infrastructure",
-              "HIPAA-Compliant Data Encryption",
-              "99.4% Scoring Accuracy"
+              "3,097 Subjects",
+              "6 Systems",
+              "100% Scoring Accuracy"
             ].map((text, i) => (
               <div key={i} className="flex items-center gap-3 text-sm font-bold text-health-text bg-white p-4 rounded-2xl border border-health-border shadow-sm">
                 <CheckCircle size={20} className="text-health-primary" />
