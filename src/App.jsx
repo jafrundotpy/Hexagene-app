@@ -26,14 +26,8 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// 🔓 PUBLIC ROUTE (Prevent logged-in users from going back to login)
+// 🔓 PUBLIC ROUTE (Accessible even if logged in, as per user request)
 const PublicRoute = ({ children }) => {
-  const token = localStorage.getItem("token");
-
-  if (token) {
-    return <Navigate to="/dashboard/simulations" replace />;
-  }
-
   return children;
 };
 
