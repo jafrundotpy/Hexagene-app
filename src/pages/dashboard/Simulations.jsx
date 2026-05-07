@@ -28,6 +28,7 @@ const Simulations = () => {
   const [statusMsg, setStatusMsg] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [results, setResults] = useState(null);
+  const [bridgeIp, setBridgeIp] = useState("");
   const fileRef = useRef();
 
   const [form, setForm] = useState({
@@ -83,6 +84,41 @@ const Simulations = () => {
       setStatusMsg("✓ Wearable data synced successfully");
     } catch (err) {
       setStatusMsg("❌ Sync failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // NEW: Merlin Smart Ring Sync via Mobile Bridge
+  const handleSyncMerlinRing = async () => {
+    if (!bridgeIp) {
+      setStatusMsg("⚠️ Please enter Merlin Bridge IP address");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatusMsg("Connecting to Merlin Bridge...");
+      
+      const response = await fetch(`http://${bridgeIp}:8080/data`, {
+        mode: 'cors'
+      });
+
+      if (!response.ok) throw new Error("Bridge connection failed");
+      const data = await response.json();
+
+      setForm(prev => ({
+        ...prev,
+        dailySteps: data.steps || prev.dailySteps,
+        restingHR: data.heartRate || prev.restingHR,
+        hrv: data.hrv || prev.hrv,
+        oxygen: data.spo2 || prev.oxygen,
+        sleepDuration: data.sleep || prev.sleepDuration,
+      }));
+
+      setStatusMsg(`✓ Merlin Ring Data Synced (Battery: ${data.battery}%)`);
+    } catch (err) {
+      setStatusMsg("❌ Merlin Sync failed: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -258,6 +294,42 @@ const Simulations = () => {
           <span className="font-bold">{statusMsg}</span>
         </div>
       )}
+
+      {/* MERLIN RING SYNC BRIDGE */}
+      <div className="health-card p-6 bg-health-primary/5 border-health-primary/20 flex flex-col md:flex-row items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-health-primary flex items-center justify-center text-white shadow-lg">
+            <Zap size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-health-text">Merlin Smart Ring</h3>
+            <p className="text-[10px] text-health-muted uppercase font-bold tracking-tighter">BLE Bridge Integration</p>
+          </div>
+        </div>
+        
+        <div className="flex-1 w-full md:w-auto">
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Enter Bridge IP (e.g. 192.168.1.15)"
+              className="input-health w-full pl-4 pr-32 py-3 bg-white"
+              value={bridgeIp}
+              onChange={(e) => setBridgeIp(e.target.value)}
+            />
+            <button 
+              onClick={handleSyncMerlinRing}
+              disabled={loading}
+              className="absolute right-2 top-2 bottom-2 px-4 bg-health-primary text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Syncing..." : "Sync Merlin"}
+            </button>
+          </div>
+        </div>
+        
+        <div className="text-[10px] text-health-muted max-w-[200px] leading-tight">
+          Connect your Merlin Ring to the mobile bridge app to sync real-time biometric data.
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         

@@ -1,15 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Logo = ({ size = 32, showText = true, className = "", onClick }) => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogoClick = (e) => {
-    if (onClick) {
-      onClick(e);
-    } else {
-      navigate('/');
-    }
+    // If inside dashboard or anywhere, clicking logo resets session and goes home
+    logout(); 
+    navigate('/');
+    if (onClick) onClick(e);
   };
 
   return (
