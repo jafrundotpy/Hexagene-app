@@ -644,6 +644,44 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
     _increment_usage(key_data)
     return report
 
+@app.post("/api/wearable/live-sync", tags=["scoring"])
+async def live_sync(request: WearableScoreRequest, key_data=Depends(verify_api_key)):
+    """
+    Safely bridges live wearable data from the Android BLE Bridge directly into the engine
+    without modifying existing calculations or overwriting stored scores.
+    """
+    if not _READY["ok"]:
+        raise HTTPException(status_code=503, detail="engine not ready")
+        
+    # Map raw wearable form fields
+    row = {
+        "age": request.age,
+        "sex": request.sex,
+        "daily_steps": request.daily_steps,
+        "resting_heart_rate": request.resting_heart_rate,
+        "avg_sleep_hours": request.avg_sleep_hours,
+        "hrv": request.hrv,
+        "stress_score": request.stress_score,
+        "spo2": request.spo2,
+        "calories_burned": request.calories_burned,
+        "active_minutes": request.active_minutes
+    }
+    
+    # Use isolated mapping logic
+    patient_data = wearable_to_patient_input(row)
+    logger.info(f"Live Sync Engine Input: {patient_data}")
+    
+    try:
+        raw_report = patient_report(patient_data)
+        report = generate_clinical_report(raw_report)
+        report["live_sync_active"] = True
+    except Exception as e:
+        logger.exception("engine error during live sync")
+        raise HTTPException(status_code=500, detail="engine error")
+        
+    _increment_usage(key_data)
+    return report
+
 @app.post("/api/ocr-wearable", tags=["ocr"])
 async def ocr_wearable(file: UploadFile = File(...)):
     """

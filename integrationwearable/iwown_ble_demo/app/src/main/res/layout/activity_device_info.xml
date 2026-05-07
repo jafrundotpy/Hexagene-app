@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical">
+
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/height"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:leftText="身高"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        />
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/age"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        app:leftText="年龄"/>
+
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/weight"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        app:leftText="体重"/>
+
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/walk"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        app:leftText="走路距离校准值"/>
+
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/run"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        app:leftText="跑步距离校准值"
+        />
+
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/step"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        app:leftText="计步灵敏度"/>
+
+    <com.zeroner.bledemo.view.LSettingItem
+        android:id="@+id/light"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:rightStyle="1"
+        app:isShowRightText="true"
+        app:rightText=""
+        app:leftText="翻腕灵敏度"/>
+
+    <Button
+        android:id="@+id/bt_retry"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="重新发送指令"
+        android:textColor="@color/black"
+        />
+
+</LinearLayout>

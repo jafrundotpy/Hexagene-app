@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/root_layout_firmware"
+    tools:context="com.zeroner.bledemo.setting.FirmwareUpdateActivity">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/title_layout_firmware"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:theme="@style/AppTheme.AppBarOverlay"
+        tools:ignore="MissingConstraints">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar_device_firmware"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="#0475E4"
+            app:title="@string/sync_progress_text_update"
+            app:popupTheme="@style/AppTheme.PopupOverlay">
+        </androidx.appcompat.widget.Toolbar>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <io.netopen.hotbitmapgg.library.view.RingProgressBar
+        android:id="@+id/progress_bar_2"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_centerInParent="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="100dp"
+        app:layout_constraintLeft_toLeftOf="@+id/root_layout_firmware"
+        app:layout_constraintRight_toRightOf="@+id/root_layout_firmware"
+        app:layout_constraintTop_toBottomOf="@+id/title_layout_firmware"
+        android:layout_marginTop="@dimen/dip_size_24"
+        app:max="100"
+        app:ringColor="@android:color/darker_gray"
+        app:ringProgressColor="@color/colorPrimary"
+        app:ringWidth="5dp"
+        app:style="STROKE"
+        app:textColor="@color/red_1"
+        app:textIsShow="true"
+        app:textSize="16sp"
+        android:visibility="visible"/>
+
+    <TextView
+        android:id="@+id/dfu_statue"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/dip_size_24"
+        app:layout_constraintTop_toBottomOf="@+id/progress_bar_2"
+        app:layout_constraintLeft_toLeftOf="@+id/progress_bar_2"
+        app:layout_constraintRight_toRightOf="@+id/progress_bar_2"
+        android:layout_marginTop="@dimen/dip_size_10"
+        android:maxLines="10"
+        android:textColor="@color/red_1"
+        android:text="@string/update_step_write_device_1"
+        android:gravity="center"
+        />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:visibility="gone"
+        android:id="@+id/nobel_layout"
+        app:layout_constraintTop_toBottomOf="@+id/dfu_statue"
+        android:layout_height="wrap_content">
+        <Button
+            android:id="@+id/button_select_file"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            android:textAllCaps="false"
+            app:layout_constraintRight_toRightOf="parent"
+            android:layout_marginTop="@dimen/dip_size_10"
+            android:text="@string/sync_progress_text_select_file"
+            />
+
+        <Button
+            android:id="@+id/button_select_res_file"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/button_select_file"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            android:layout_marginTop="@dimen/dip_size_10"
+            android:text="升级资源" />
+
+        <TextView
+            android:id="@+id/file_path"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/button_select_res_file"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            android:layout_marginTop="@dimen/dip_size_10"
+            />
+
+        <Button
+            android:id="@+id/button_start"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/file_path"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            android:layout_marginTop="@dimen/dip_size_10"
+            android:text="@string/sync_progress_text_start_upgrade"
+            android:visibility="gone"
+            />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/goodixLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/dfu_statue">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/blue"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <CheckBox
+            android:id="@+id/upFirBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="5dp"
+            android:text="开启程序升级"
+            android:textAllCaps="false"
+            app:layout_constraintRight_toLeftOf="@+id/upResBox"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <CheckBox
+            android:id="@+id/upResBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="开启资源升级"
+            app:layout_constraintLeft_toRightOf="@+id/upFirBox"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/firPathTxt"
+            android:layout_width="wrap_content"
+            android:text="程序:"
+            app:layout_constraintTop_toBottomOf="@+id/upResBox"
+            app:layout_constraintLeft_toLeftOf="@+id/upFirBox"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:id="@+id/resPathTxt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="资源:"
+            app:layout_constraintLeft_toLeftOf="@+id/upResBox"
+            app:layout_constraintTop_toBottomOf="@+id/upResBox"/>
+
+        <Button
+            android:id="@+id/firPathBtn"
+            android:layout_width="wrap_content"
+            android:text="选择程序文件"
+            android:textAllCaps="false"
+            app:layout_constraintRight_toLeftOf="@+id/resPathBtn"
+            app:layout_constraintTop_toBottomOf="@+id/resPathTxt"
+            app:layout_constraintLeft_toLeftOf="parent"
+            android:layout_height="wrap_content"/>
+        <Button
+            android:id="@+id/resPathBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="选择资源文件"
+            android:textAllCaps="false"
+            app:layout_constraintTop_toBottomOf="@+id/resPathTxt"
+            app:layout_constraintLeft_toRightOf="@+id/firPathBtn"
+            app:layout_constraintRight_toRightOf="parent"/>
+        <Button
+            android:id="@+id/start5515Btn"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="开始升级"
+            android:textAllCaps="false"
+            app:layout_constraintTop_toBottomOf="@+id/firPathBtn"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

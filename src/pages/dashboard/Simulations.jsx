@@ -114,9 +114,12 @@ const Simulations = () => {
         hrv: data.hrv || prev.hrv,
         oxygen: data.spo2 || prev.oxygen,
         sleepDuration: data.sleep || prev.sleepDuration,
+        stress: data.stress || prev.stress,
+        calories: data.calories || prev.calories,
+        activeMinutes: data.activeMinutes || prev.activeMinutes
       }));
 
-      setStatusMsg(`✓ Merlin Ring Data Synced (Battery: ${data.battery}%)`);
+      setStatusMsg(`✓ Live Wearable Data Synced (Battery: ${data.battery}%)`);
     } catch (err) {
       setStatusMsg("❌ Merlin Sync failed: " + err.message);
     } finally {
@@ -168,24 +171,21 @@ const Simulations = () => {
       setLoading(true);
       setStatusMsg("Calculating Hexa Health Score...");
       
-      // Format input for Boss /v2/score
+      // Format input for live-sync endpoint
       const payload = {
         age: parseInt(form.age),
         sex: parseInt(form.sex),
-        blood: {
-          hba1c: parseFloat(form.hba1c) || 5.4,
-          uric_acid: parseFloat(form.uricAcid) || 5.2
-        },
-        wearables: {
-          steps: parseFloat(form.dailySteps) || 0,
-          hr: parseFloat(form.restingHR) || 0,
-          sleep: parseFloat(form.sleepDuration) || 0,
-          hrv: parseFloat(form.hrv) || 0,
-          spo2: parseFloat(form.oxygen) || 0,
-        }
+        daily_steps: parseFloat(form.dailySteps) || 0,
+        resting_heart_rate: parseFloat(form.restingHR) || 0,
+        avg_sleep_hours: parseFloat(form.sleepDuration) || 0,
+        hrv: parseFloat(form.hrv) || 0,
+        stress_score: parseFloat(form.stress) || 0,
+        spo2: parseFloat(form.oxygen) || 0,
+        calories_burned: parseFloat(form.calories) || 0,
+        active_minutes: parseFloat(form.activeMinutes) || 0
       };
 
-      const response = await fetch(`${API_URL}/v2/score`, {
+      const response = await fetch(`${API_URL}/api/wearable/live-sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -321,7 +321,7 @@ const Simulations = () => {
               disabled={loading}
               className="absolute right-2 top-2 bottom-2 px-4 bg-health-primary text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/90 transition-colors disabled:opacity-50"
             >
-              {loading ? "Syncing..." : "Sync Merlin"}
+              {loading ? "Connecting..." : "Connect Wearable Device"}
             </button>
           </div>
         </div>

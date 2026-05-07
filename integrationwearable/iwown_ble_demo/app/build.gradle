@@ -1,0 +1,133 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.zeroner.bledemo'
+    compileSdkVersion rootProject.ext.android["compileSdkVersion"]
+    buildToolsVersion rootProject.ext.android["buildToolsVersion"]
+    defaultConfig {
+        applicationId "com.iwown.bledemo"
+        minSdkVersion rootProject.ext.android["minSdkVersion"]
+        targetSdkVersion rootProject.ext.android["targetSdkVersion"]
+        versionCode rootProject.ext.android["versionCode"]
+        versionName rootProject.ext.android["versionName"]
+        vectorDrawables.useSupportLibrary = true
+        multiDexEnabled true
+
+        buildFeatures{
+            viewBinding = true
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def buildName = "IWBle"
+            def type = variant.buildType.name
+            def versionName = variant.versionName
+            def releaseApkName = buildName + '_' + type + "_" + versionName  + '.apk'
+            outputFileName = releaseApkName
+        }
+    }
+    buildTypes {
+        release {
+            buildConfigField "boolean", "LOG_DEBUG", "true"
+            buildConfigField "String", "ROOT_PATH", '"/Zeroner/sdk/"'
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            ndk {
+                abiFilters "armeabi", "arm64-v8a", "armeabi-v7a"
+            }
+        }
+        debug {
+            buildConfigField "boolean", "LOG_DEBUG", "true"
+            buildConfigField "String", "ROOT_PATH", '"/Zeroner/sdk/"'
+            minifyEnabled false
+            testCoverageEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            debuggable true
+
+        }
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
+        // Or, if you prefer, you can continue to check for errors in release builds,
+        // but continue the build even when errors are found:
+        abortOnError false
+    }
+
+    repositories {
+        flatDir {
+            dirs 'libs','../blesdk/libs'
+        }
+    }
+
+    sourceSets {
+        main{
+            jniLibs.srcDirs = ['libs']     //设置目标的so存放路径
+        }
+    }
+
+//    compileOptions {
+//        sourceCompatibility JavaVersion.VERSION_1_8
+//        targetCompatibility JavaVersion.VERSION_1_8
+//    }
+
+
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation rootProject.ext.dependencies["support-v4"]
+    implementation rootProject.ext.dependencies["appcompat-v7"]
+    implementation rootProject.ext.dependencies["recyclerview-v7"]
+    implementation rootProject.ext.dependencies['constraint-layout']
+    implementation rootProject.ext.dependencies['design']
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation files('libs/MPAndroidChart-v3.0.3.jar')
+    implementation rootProject.ext.dependencies['grantor']
+    implementation rootProject.ext.dependencies['commons-codec']
+    implementation rootProject.ext.dependencies['gson']
+    implementation rootProject.ext.dependencies['klog']
+    implementation rootProject.ext.dependencies['smartRefreshLayout']
+    implementation rootProject.ext.dependencies['cardview-v7']
+    implementation rootProject.ext.dependencies['eventbus']
+    implementation rootProject.ext.dependencies['refreshRecyclerView']
+    implementation rootProject.ext.dependencies['litepal']
+    implementation rootProject.ext.dependencies['pickerview']
+    implementation rootProject.ext.dependencies['stetho']
+    implementation rootProject.ext.dependencies['SpinKit']
+    implementation rootProject.ext.dependencies['permissions']
+    implementation rootProject.ext.dependencies['timelineview']
+    implementation rootProject.ext.dependencies['lfilepickerlibrary']
+    implementation rootProject.ext.dependencies['multidex']
+    implementation rootProject.ext.dependencies['okhttp3']
+    implementation rootProject.ext.dependencies['utilcode']
+    implementation rootProject.ext.dependencies['protobuf']
+    implementation rootProject.ext.dependencies['easypermissions']
+    implementation rootProject.ext.dependencies['rxandroid2']
+    implementation rootProject.ext.dependencies['rxjava2']
+    implementation rootProject.ext.dependencies['excel']
+//    implementation 'io.github.molihuan:pathselector:1.1.16'
+//    implementation 'com.github.LuckSiege.PictureSelector:picture_library:v2.6.0'
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.4.1"
+    def lifecycle_version = "2.2.0"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version"
+
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.0'
+    implementation 'com.google.protobuf:protobuf-java:3.11.0'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    // 遍历libs目录下的所有aar包并引入
+    fileTree(dir: 'libs', include: ['*.aar']).each { File file ->
+        api(name: file.name.replace('.aar', ''), ext: 'aar')
+    }
+}
