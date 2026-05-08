@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#3F51B5</color>
-    <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#FF4081</color>
-    <color name="device_bgk">#e0e0e0</color>
-    <color name="white">#ffffff</color>
-    <color name="blue">#0475E4</color>
-    <color name="sky">#00ff00</color>
-    <color name="black">#000000</color>
-    <color name="red_1">#ff3311</color>
-    <color name="yellow">#FFCC00</color>
-    <color name="color_1">#4B0082</color>
-    <color name="color_2">#8A2BE2</color>
-    <color name="color_3">#DDA0DD</color>
-    <color name="title_bar_color">#0476E6</color>
-
-    <color name="i_c8c7cc">#c8c7cc</color>
-    <color name="i_161616">#161616</color>
+    <color name="colorPrimary">#10b981</color>
+    <color name="colorPrimaryDark">#059669</color>
+    <color name="colorAccent">#34d399</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#111827</color>
+    <color name="gray_50">#F9FAFB</color>
+    <color name="gray_100">#F3F4F6</color>
+    <color name="gray_200">#E5E7EB</color>
+    <color name="gray_300">#D1D5DB</color>
+    <color name="gray_400">#9CA3AF</color>
+    <color name="gray_500">#6B7280</color>
+    <color name="gray_600">#4B5563</color>
+    <color name="gray_700">#374151</color>
+    <color name="hexagene_green">#10b981</color>
+    <color name="hexagene_green_light">#ecfdf5</color>
+    <color name="status_connected">#10b981</color>
+    <color name="status_disconnected">#ef4444</color>
 </resources>

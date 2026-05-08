@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/gray_50">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Header Status -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_card_metrics"
+            android:padding="16dp"
+            android:layout_marginBottom="20dp">
+
+            <View
+                android:id="@+id/status_indicator"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@drawable/circle_status"
+                android:backgroundTint="@color/status_connected" />
+
+            <TextView
+                android:id="@+id/tv_connection_status"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="QRing Connected"
+                android:textStyle="bold"
+                android:textColor="@color/black" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_battery"
+                android:tint="@color/gray_500" />
+
+            <TextView
+                android:id="@+id/tv_battery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="85%"
+                android:textColor="@color/gray_700" />
+        </LinearLayout>
+
+        <!-- Metrics Grid -->
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="2"
+            android:rowCount="3"
+            android:alignmentMode="alignMargins"
+            android:columnOrderPreserved="false">
+
+            <!-- Heart Rate -->
+            <include
+                android:id="@+id/card_hr"
+                layout="@layout/layout_metric_card" />
+
+            <!-- SpO2 -->
+            <include
+                android:id="@+id/card_spo2"
+                layout="@layout/layout_metric_card" />
+
+            <!-- HRV -->
+            <include
+                android:id="@+id/card_hrv"
+                layout="@layout/layout_metric_card" />
+
+            <!-- Stress -->
+            <include
+                android:id="@+id/card_stress"
+                layout="@layout/layout_metric_card" />
+
+            <!-- Steps -->
+            <include
+                android:id="@+id/card_steps"
+                layout="@layout/layout_metric_card" />
+
+            <!-- Sleep -->
+            <include
+                android:id="@+id/card_sleep"
+                layout="@layout/layout_metric_card" />
+
+        </GridLayout>
+
+        <Button
+            android:id="@+id/btn_sync_now"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="@color/hexagene_green"
+            android:text="Sync Latest Data"
+            android:textAllCaps="false"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_last_sync"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="12dp"
+            android:text="Last updated: Just now"
+            android:textSize="12sp"
+            android:textColor="@color/gray_400" />
+
+    </LinearLayout>
+</ScrollView>

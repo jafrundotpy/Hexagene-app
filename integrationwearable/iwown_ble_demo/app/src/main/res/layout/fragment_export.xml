@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="32dp"
+    android:background="@color/white"
+    android:gravity="center">
+
+    <ImageView
+        android:id="@+id/iv_success_anim"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:src="@drawable/ic_check_circle"
+        android:tint="@color/hexagene_green"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/pb_exporting"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:indeterminateTint="@color/hexagene_green"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/iv_cloud"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/ic_cloud_upload"
+        android:tint="@color/hexagene_green" />
+
+    <TextView
+        android:id="@+id/tv_export_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="Ready to Export"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@color/black" />
+
+    <TextView
+        android:id="@+id/tv_export_desc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Your QRing biometrics are synced locally. Click below to update your HexaGene Dashboard."
+        android:gravity="center"
+        android:textSize="16sp"
+        android:textColor="@color/gray_500" />
+
+    <Button
+        android:id="@+id/btn_export"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="48dp"
+        android:backgroundTint="@color/hexagene_green"
+        android:text="Export to HexaGene"
+        android:textAllCaps="false"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tv_success_msg"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Synced Successfully to HexaGene"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/hexagene_green"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btn_open_dashboard"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="16dp"
+        android:backgroundTint="@color/gray_100"
+        android:text="View Dashboard"
+        android:textAllCaps="false"
+        android:textColor="@color/gray_700"
+        android:visibility="gone" />
+
+</LinearLayout>

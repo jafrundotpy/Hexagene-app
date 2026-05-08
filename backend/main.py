@@ -277,6 +277,8 @@ class WearableIngestRequest(BaseModel):
     stress_score: Optional[float] = None
     spo2: Optional[float] = None
     calories_burned: Optional[float] = None
+    battery: Optional[int] = None
+    device_id: Optional[str] = None
     age: Optional[int] = None
     sex: Optional[str] = None
     source: Optional[str] = "apple_health"
@@ -306,26 +308,6 @@ def create_token(data):
     payload = data.copy()
     payload["exp"] = datetime.now(timezone.utc) + timedelta(hours=24)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-_DEMO_WEARABLE = {
-    "user_id": "demo",
-    "age": 34,
-    "sex": "M",
-    "daily_steps": 8200,
-    "resting_heart_rate": 62,
-    "avg_sleep_hours": 7.2,
-    "hrv": 58,
-    "active_minutes": 45,
-    "stress_score": 28,
-    "spo2": 98,
-    "calories_burned": 420,
-    "vo2max": 42,
-    "recovery_score": 74,
-    "sleep_score": 82,
-    "sleep_debt": 0.4,
-    "created_at": "2026-05-01T08:00:00Z",
-    "_demo": True,
-}
 
 def fetch_latest_wearable(user_id: str) -> dict:
     try:
@@ -829,10 +811,18 @@ async def ingest_wearable(payload: WearableIngestRequest):
     if not target_user_id:
         raise HTTPException(status_code=400, detail="Missing user_id or valid email")
 
+    # Basic Data Validation
+    if payload.resting_heart_rate is not None and (payload.resting_heart_rate < 30 or payload.resting_heart_rate > 220):
+        payload.resting_heart_rate = None
+    if payload.spo2 is not None and (payload.spo2 < 50 or payload.spo2 > 100):
+        payload.spo2 = None
+    if payload.hrv is not None and (payload.hrv < 5 or payload.hrv > 250):
+        payload.hrv = None
+
     row = {"user_id": target_user_id, "source": payload.source or "apple_health"}
     for field in ["daily_steps", "resting_heart_rate", "avg_sleep_hours",
                   "hrv", "active_minutes", "stress_score", "spo2",
-                  "calories_burned", "age", "sex"]:
+                  "calories_burned", "battery", "device_id", "age", "sex"]:
         val = getattr(payload, field, None)
         if val is not None:
             row[field] = val
@@ -852,6 +842,39 @@ async def ingest_wearable(payload: WearableIngestRequest):
     except Exception as e:
         logger.exception("Failed to insert wearable data")
         raise HTTPException(status_code=500, detail=f"Supabase insert failed: {str(e)}")
+
+@app.get("/v2/wearable-data/{email}", tags=["ingest"])
+async def get_wearable_data(email: str):
+    """
+    Fetch latest wearable metrics for a given email.
+    Used by the dashboard for auto-fill.
+    """
+    try:
+        # 1. Resolve email to user_id
+        res = supabase.table("users").select("id").eq("email", email).limit(1).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user_id = res.data[0]["id"]
+
+        # 2. Fetch latest wearable metrics
+        metrics = supabase.table("wearable_metrics")\
+            .select("*")\
+            .eq("user_id", user_id)\
+            .order("created_at", desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if not metrics.data:
+            return {"success": False, "message": "No wearable data found"}
+        
+        return {"success": True, "data": metrics.data[0]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching wearable data for {email}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
 # ROOT

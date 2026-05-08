@@ -9,18 +9,12 @@ import {
   RefreshCw,
   Dna,
   User,
-  ShieldAlert,
   Info,
   Loader2,
   Stethoscope,
   ClipboardCheck,
-  Droplets,
-  CheckCircle,
-  FileText,
-  AlertCircle,
   Bluetooth,
-  BluetoothSearching,
-  Smartphone,
+  Download,
   Unplug
 } from "lucide-react";
 import MetricCard from "../../components/dashboard/MetricCard";
@@ -34,10 +28,9 @@ const Simulations = () => {
   const [results, setResults] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false);
   const fileRef = useRef();
 
+  const [wearableData, setWearableData] = useState(null);
   const [form, setForm] = useState({
     age: "35", sex: "0", hba1c: "5.4", uricAcid: "5.2",
     restingHR: "62", dailySteps: "8500", 
@@ -48,51 +41,53 @@ const Simulations = () => {
   const updateField = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
   // PRESERVED: Wearable Sync Logic
+  // PRESERVED: Wearable Sync Logic - Updated for HexaGene Cloud Sync
   const handleSyncWearable = async () => {
     try {
-      setLoading(true);
-      setStatusMsg("Syncing with health database...");
-      
       const token = localStorage.getItem("token");
-      let userId = "demo-user";
+      let email = "";
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]));
-          if (payload.id) userId = payload.id;
+          email = payload.email || payload.sub; // Fallback to sub if email not explicit
         } catch (e) {}
       }
 
-      const response = await fetch(`${API_URL}/v2/wearable-data`, {
-        method: "POST",
+      if (!email) {
+        console.warn("No user email found for sync");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/v2/wearable-data/${email}`, {
+        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           "x-api-key": "merlin123merlin123" 
-        },
-        body: JSON.stringify({ user_id: userId })
+        }
       });
 
       if (!response.ok) throw new Error("Failed to fetch wearable data");
-      const data = await response.json();
+      const result = await response.json();
 
-      setForm(prev => ({
-        ...prev,
-        dailySteps: data.daily_steps || prev.dailySteps,
-        restingHR: data.resting_heart_rate || prev.restingHR,
-        sleepDuration: data.avg_sleep_hours || prev.sleepDuration,
-        hrv: data.hrv || prev.hrv,
-        activeMinutes: data.active_minutes || prev.activeMinutes,
-        stress: data.stress_score || prev.stress,
-        oxygen: data.spo2 || prev.oxygen,
-        calories: data.calories_burned || prev.calories,
-        age: data.age || prev.age,
-        sex: data.sex || prev.sex,
-      }));
-
-      setStatusMsg("✓ Wearable data synced successfully");
+      if (result.success && result.data) {
+        const data = result.data;
+        setWearableData(data);
+        setForm(prev => ({
+          ...prev,
+          dailySteps: data.daily_steps || prev.dailySteps,
+          restingHR: data.resting_heart_rate || prev.restingHR,
+          sleepDuration: data.avg_sleep_hours || prev.sleepDuration,
+          hrv: data.hrv || prev.hrv,
+          activeMinutes: data.active_minutes || prev.activeMinutes,
+          stress: data.stress_score || prev.stress,
+          oxygen: data.spo2 || prev.oxygen,
+          calories: data.calories_burned || prev.calories,
+          age: data.age || prev.age,
+          sex: data.sex || prev.sex,
+        }));
+        setLastSyncTime(new Date().toLocaleTimeString());
+      }
     } catch (err) {
-      setStatusMsg("❌ Sync failed: " + err.message);
-    } finally {
-      setLoading(false);
+      console.error("Wearable Sync Error:", err);
     }
   };
 
@@ -119,25 +114,14 @@ const Simulations = () => {
   const handleDownloadApp = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (isDownloading) return;
-    
-    setIsDownloading(true);
-    setDownloadProgress(0);
-    setStatusMsg("Preparing HexaGene Connector download...");
-    
-    // Simulate professional installation progress UI
-    const interval = setInterval(() => {
-      setDownloadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsDownloading(false);
-          setStatusMsg("✓ HexaGene Connector ready for installation.");
-          return 100;
-        }
-        return prev + Math.floor(Math.random() * 15) + 5;
-      });
-    }, 400);
+    // Directly trigger the real APK download — no simulated progress
+    const link = document.createElement("a");
+    link.href = "/downloads/hexagene-connector.apk";
+    link.download = "hexagene-connector.apk";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setStatusMsg("✓ HexaGene Connector APK download started. Open on your Android device to install.");
   };
 
   // PRESERVED: OCR Feature
@@ -347,56 +331,14 @@ const Simulations = () => {
               
               <button 
                 onClick={handleDownloadApp}
-                disabled={isDownloading}
-                className="px-4 py-3 bg-white text-health-primary border border-health-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/5 transition-all disabled:opacity-50"
+                className="px-4 py-3 bg-white text-health-primary border border-health-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/5 transition-all flex items-center gap-2"
               >
-                {isDownloading ? `Downloading ${Math.min(downloadProgress, 100)}%` : "Get App"}
+                <Download size={14} />
+                Get App
               </button>
             </div>
           </div>
         </div>
-
-        {(isDownloading || downloadProgress === 100) && (
-          <div className="bg-white border border-health-primary/20 rounded-xl p-6 animate-fade-in space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-health-primary/10 text-health-primary">
-                  <Download size={18} />
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-black text-health-text uppercase tracking-widest">
-                    {downloadProgress < 100 ? "Preparing Connector App..." : "Connector Ready"}
-                  </h4>
-                  <p className="text-[9px] text-health-muted">Version 1.0.0 • Android (SDK Based)</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-health-primary">{Math.min(downloadProgress, 100)}%</span>
-            </div>
-            
-            <div className="h-2 w-full bg-health-surface rounded-full overflow-hidden border border-health-border">
-              <div 
-                className="h-full bg-health-primary transition-all duration-300"
-                style={{ width: `${Math.min(downloadProgress, 100)}%` }}
-              />
-            </div>
-
-            {downloadProgress === 100 && (
-              <div className="pt-2">
-                <a 
-                  href="/downloads/hexagene-connector.apk"
-                  download="hexagene-connector.apk"
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-health-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary-dark transition-all shadow-lg shadow-health-primary/20"
-                >
-                  <Download size={14} />
-                  Download APK Now
-                </a>
-                <p className="text-center text-[9px] text-health-muted mt-3">
-                  Open the downloaded file on your Android device to install.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
 
         {isSyncing && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
@@ -413,11 +355,11 @@ const Simulations = () => {
             </div>
             <div className="bg-white border border-health-primary/10 rounded-xl p-3 flex flex-col items-center text-center">
               <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter mb-1">Battery</span>
-              <span className="text-[10px] font-bold text-health-text">100%</span>
+              <span className="text-[10px] font-bold text-health-text">{wearableData?.battery || 0}%</span>
             </div>
             <div className="bg-white border border-health-primary/10 rounded-xl p-3 flex flex-col items-center text-center">
               <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter mb-1">Last Update</span>
-              <span className="text-[10px] font-bold text-health-text">Just now</span>
+              <span className="text-[10px] font-bold text-health-text">{lastSyncTime || "Searching..."}</span>
             </div>
           </div>
         )}
