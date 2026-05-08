@@ -132,16 +132,7 @@ const Simulations = () => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsDownloading(false);
-          setStatusMsg("✓ HexaGene Connector downloaded. Please open the APK to install.");
-          
-          // Trigger actual download
-          const link = document.createElement('a');
-          link.href = '/downloads/hexagene-connector.apk';
-          link.download = 'hexagene-connector.apk';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
+          setStatusMsg("✓ HexaGene Connector ready for installation.");
           return 100;
         }
         return prev + Math.floor(Math.random() * 15) + 5;
@@ -365,18 +356,45 @@ const Simulations = () => {
           </div>
         </div>
 
-        {isDownloading && (
-          <div className="bg-white border border-health-primary/20 rounded-xl p-4 animate-fade-in">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black text-health-text uppercase tracking-widest">Installing HexaGene Connector...</span>
+        {(isDownloading || downloadProgress === 100) && (
+          <div className="bg-white border border-health-primary/20 rounded-xl p-6 animate-fade-in space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-health-primary/10 text-health-primary">
+                  <Download size={18} />
+                </div>
+                <div>
+                  <h4 className="text-[10px] font-black text-health-text uppercase tracking-widest">
+                    {downloadProgress < 100 ? "Preparing Connector App..." : "Connector Ready"}
+                  </h4>
+                  <p className="text-[9px] text-health-muted">Version 1.0.0 • Android (SDK Based)</p>
+                </div>
+              </div>
               <span className="text-[10px] font-bold text-health-primary">{Math.min(downloadProgress, 100)}%</span>
             </div>
+            
             <div className="h-2 w-full bg-health-surface rounded-full overflow-hidden border border-health-border">
               <div 
                 className="h-full bg-health-primary transition-all duration-300"
                 style={{ width: `${Math.min(downloadProgress, 100)}%` }}
               />
             </div>
+
+            {downloadProgress === 100 && (
+              <div className="pt-2">
+                <a 
+                  href="/downloads/hexagene-connector.apk"
+                  download="hexagene-connector.apk"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-health-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary-dark transition-all shadow-lg shadow-health-primary/20"
+                >
+                  <Download size={14} />
+                  Download APK Now
+                </a>
+                <p className="text-center text-[9px] text-health-muted mt-3">
+                  Open the downloaded file on your Android device to install.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
