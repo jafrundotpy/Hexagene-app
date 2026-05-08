@@ -34,6 +34,8 @@ const Simulations = () => {
   const [results, setResults] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   const fileRef = useRef();
 
   const [form, setForm] = useState({
@@ -112,6 +114,39 @@ const Simulations = () => {
   const handleStopSync = () => {
     setIsSyncing(false);
     setStatusMsg("Cloud synchronization paused.");
+  };
+
+  const handleDownloadApp = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isDownloading) return;
+    
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setStatusMsg("Preparing HexaGene Connector download...");
+    
+    // Simulate professional installation progress UI
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsDownloading(false);
+          setStatusMsg("✓ HexaGene Connector downloaded. Please open the APK to install.");
+          
+          // Trigger actual download
+          const link = document.createElement('a');
+          link.href = '/downloads/hexagene-connector.apk';
+          link.download = 'hexagene-connector.apk';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          return 100;
+        }
+        return prev + Math.floor(Math.random() * 15) + 5;
+      });
+    }, 400);
   };
 
   // PRESERVED: OCR Feature
@@ -319,15 +354,31 @@ const Simulations = () => {
                 </button>
               )}
               
-              <a 
-                href="/downloads/hexagene-connector.apk" 
-                className="px-4 py-3 bg-white text-health-primary border border-health-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/5 transition-all"
+              <button 
+                onClick={handleDownloadApp}
+                disabled={isDownloading}
+                className="px-4 py-3 bg-white text-health-primary border border-health-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/5 transition-all disabled:opacity-50"
               >
-                Get App
-              </a>
+                {isDownloading ? `Downloading ${Math.min(downloadProgress, 100)}%` : "Get App"}
+              </button>
             </div>
           </div>
         </div>
+
+        {isDownloading && (
+          <div className="bg-white border border-health-primary/20 rounded-xl p-4 animate-fade-in">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black text-health-text uppercase tracking-widest">Installing HexaGene Connector...</span>
+              <span className="text-[10px] font-bold text-health-primary">{Math.min(downloadProgress, 100)}%</span>
+            </div>
+            <div className="h-2 w-full bg-health-surface rounded-full overflow-hidden border border-health-border">
+              <div 
+                className="h-full bg-health-primary transition-all duration-300"
+                style={{ width: `${Math.min(downloadProgress, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {isSyncing && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
