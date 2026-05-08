@@ -13,6 +13,7 @@ import ApiAccess from './pages/dashboard/ApiAccess';
 import IntegrationDocs from './pages/dashboard/IntegrationDocs';
 import Usage from './pages/dashboard/Usage';
 import Settings from './pages/dashboard/Settings';
+import BleConnect from './pages/connect/BleConnect';
 
 // 🔐 PROTECTED ROUTE (TOKEN BASED)
 const ProtectedRoute = ({ children }) => {
@@ -86,6 +87,7 @@ function App() {
           <Route path="simulations" element={<Simulations />} />
           <Route path="usage" element={<Usage />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="connect" element={<BleConnect />} />
         </Route>
 
         {/* ❌ CATCH ALL */}
