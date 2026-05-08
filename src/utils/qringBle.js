@@ -62,15 +62,8 @@ export class QRingBLE {
     const shortServiceId = 0xfff0; 
 
     this.device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: [shortServiceId] },
-        { namePrefix: 'QRing' },
-        { namePrefix: 'X6' },
-        { namePrefix: 'Ring' },
-        { namePrefix: 'RING' },
-        { namePrefix: 'Smart' }
-      ],
-      optionalServices: [SERVICE_UUID, shortServiceId],
+      acceptAllDevices: true,
+      optionalServices: [shortServiceId, SERVICE_UUID],
     });
 
     this.device.addEventListener('gattserverdisconnected', () => {

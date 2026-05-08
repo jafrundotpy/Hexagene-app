@@ -91,7 +91,7 @@ export default function BleConnect() {
 
     try {
       setPhase(PHASE.CONNECTING);
-      setStatusMsg("Scanning for QRing X6...");
+      setStatusMsg("Opening Bluetooth menu... Pick your QRing/X6 from the list.");
 
       const ble = new QRingBLE();
       bleRef.current = ble;
