@@ -11,11 +11,14 @@
   },
   "dependencies": {
     "lucide-react": "^1.8.0",
+    "lucide-react-native": "^1.14.0",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-dropzone": "^14.3.5",
+    "react-native-ble-plx": "^3.5.1",
+    "react-native-http-bridge-refurbished": "^1.2.9",
     "react-router-dom": "^7.14.1",
     "recharts": "^3.8.1"
   },

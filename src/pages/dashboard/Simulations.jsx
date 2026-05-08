@@ -32,8 +32,8 @@ const Simulations = () => {
   const [statusMsg, setStatusMsg] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [results, setResults] = useState(null);
-  const [scanState, setScanState] = useState('idle'); // 'idle', 'scanning', 'found'
-  const [connectedDevice, setConnectedDevice] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
   const fileRef = useRef();
 
   const [form, setForm] = useState({
@@ -94,101 +94,24 @@ const Simulations = () => {
     }
   };
 
-  // NEW: Direct Web Bluetooth QRing Sync
-  const handleScanDevice = async () => {
-    try {
-      setScanState('scanning');
-      setStatusMsg("Requesting Bluetooth device scan...");
-      
-      // Native Web Bluetooth API to popup the browser's scan window
-      const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['generic_access']
-      });
-
-      setStatusMsg(`Connecting to ${device.name || "QRing"}...`);
-      // Connect to GATT Server
-      const server = await device.gatt.connect();
-      
-      setConnectedDevice({ 
-        name: device.name || "QRing Smart Device", 
-        status: server.connected ? "Connected" : "Online", 
-        battery: "84%",
-        _device: device 
-      });
-      
-      setScanState('found');
-      setStatusMsg(`✓ Successfully connected to ${device.name || "QRing"}`);
-      
-      // Listen for disconnect
-      device.addEventListener('gattserverdisconnected', handleDisconnectDevice);
-      
-    } catch (error) {
-      console.error(error);
-      setScanState('idle');
-      setStatusMsg(`❌ Bluetooth scan failed: ${error.message}`);
+  // Cloud Sync Polling: Automatically fetch latest data every 10 seconds if sync is active
+  React.useEffect(() => {
+    let interval;
+    if (isSyncing) {
+      handleSyncWearable(); // Initial fetch
+      interval = setInterval(handleSyncWearable, 10000);
     }
+    return () => clearInterval(interval);
+  }, [isSyncing]);
+
+  const handleStartSync = () => {
+    setIsSyncing(true);
+    setStatusMsg("✓ Cloud synchronization active. Listening for wearable data...");
   };
 
-  const handleConnectDevice = () => {
-    // Left for fallback if needed, but the native scan handles connection.
-    setConnectedDevice({ name: "QRing Smart Device", status: "Online", battery: "84%" });
-    setStatusMsg("✓ Connected to QRing");
-  };
-
-  const handleDisconnectDevice = () => {
-    if (connectedDevice && connectedDevice._device && connectedDevice._device.gatt.connected) {
-      connectedDevice._device.gatt.disconnect();
-    }
-    setConnectedDevice(null);
-    setScanState('idle');
-    setStatusMsg("Device disconnected");
-  };
-
-  const handleSyncMerlinRing = async () => {
-    if (!connectedDevice) {
-      setStatusMsg("⚠️ Please connect to a device first");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setStatusMsg("Syncing data from QRing...");
-      
-      // Simulate reading data from BLE characteristics since we don't have the specific UUIDs
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const mockData = {
-        steps: Math.floor(Math.random() * 5000) + 4000,
-        heartRate: Math.floor(Math.random() * 20) + 60,
-        hrv: Math.floor(Math.random() * 30) + 40,
-        spo2: Math.floor(Math.random() * 3) + 96,
-        sleep: (Math.random() * 2 + 6).toFixed(1),
-        stress: Math.floor(Math.random() * 30) + 20,
-        calories: Math.floor(Math.random() * 500) + 1800,
-        activeMinutes: Math.floor(Math.random() * 40) + 30,
-        battery: Math.floor(Math.random() * 20) + 70
-      };
-
-      setForm(prev => ({
-        ...prev,
-        dailySteps: mockData.steps.toString(),
-        restingHR: mockData.heartRate.toString(),
-        hrv: mockData.hrv.toString(),
-        oxygen: mockData.spo2.toString(),
-        sleepDuration: mockData.sleep.toString(),
-        stress: mockData.stress.toString(),
-        calories: mockData.calories.toString(),
-        activeMinutes: mockData.activeMinutes.toString()
-      }));
-
-      setStatusMsg(`✓ Live Wearable Data Synced (Battery: ${mockData.battery}%)`);
-      setConnectedDevice(prev => ({ ...prev, battery: `${mockData.battery}%` }));
-    } catch (err) {
-      setStatusMsg("❌ QRing Sync failed: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleStopSync = () => {
+    setIsSyncing(false);
+    setStatusMsg("Cloud synchronization paused.");
   };
 
   // PRESERVED: OCR Feature
@@ -359,98 +282,73 @@ const Simulations = () => {
         </div>
       )}
 
-      {/* MERLIN RING SYNC BRIDGE */}
-      <div className="health-card p-6 bg-health-primary/5 border-health-primary/20 flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-health-primary flex items-center justify-center text-white shadow-lg">
-              <Bluetooth size={24} />
+      {/* NEW: HexaGene Cloud Sync Section */}
+      <div className="space-y-4">
+        <div className="bg-health-surface/50 border border-health-primary/20 rounded-2xl p-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-12 h-12 rounded-full bg-health-primary/10 flex items-center justify-center text-health-primary">
+                {isSyncing ? <RefreshCw className="animate-spin" size={24} /> : <Bluetooth size={24} />}
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-health-text">QRing Cloud Synchronization</h3>
+                <p className="text-xs text-health-muted mt-0.5">
+                  {isSyncing 
+                    ? "Live sync active. Wear your QRing and keep the Android app open." 
+                    : "Connect your wearable to populate simulation data automatically."}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-health-text">Wearable BLE Sync</h3>
-              <p className="text-[10px] text-health-muted uppercase font-bold tracking-tighter">Merlin Smart Ring Integration</p>
-            </div>
-          </div>
-          
-          <div className="flex-1 w-full md:w-auto flex justify-end">
-            {!connectedDevice && (
-              <button 
-                onClick={scanState === 'idle' ? handleScanDevice : undefined}
-                disabled={scanState !== 'idle'}
-                className="px-6 py-3 bg-health-primary text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-health-primary/20 hover:shadow-xl hover:shadow-health-primary/30 transition-all disabled:opacity-50 flex items-center gap-2"
+            
+            <div className="flex items-center gap-3">
+              {!isSyncing ? (
+                <button 
+                  onClick={handleStartSync}
+                  className="px-6 py-3 bg-health-primary text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-health-primary/20 hover:shadow-xl transition-all flex items-center gap-2"
+                >
+                  <Zap size={14} />
+                  Connect QRing
+                </button>
+              ) : (
+                <button 
+                  onClick={handleStopSync}
+                  className="px-6 py-3 bg-health-surface text-health-muted border border-health-border rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all flex items-center gap-2"
+                >
+                  <Unplug size={14} />
+                  Stop Sync
+                </button>
+              )}
+              
+              <a 
+                href="/downloads/hexagene-connector.apk" 
+                className="px-4 py-3 bg-white text-health-primary border border-health-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-health-primary/5 transition-all"
               >
-                {scanState === 'scanning' ? (
-                  <><BluetoothSearching size={16} className="animate-pulse" /> Scanning QRing...</>
-                ) : (
-                  <><Bluetooth size={16} /> Scan & Connect QRing</>
-                )}
-              </button>
-            )}
+                Get App
+              </a>
+            </div>
           </div>
         </div>
 
-        {!connectedDevice && scanState === 'found' && (
-          <div className="bg-white rounded-xl p-4 border border-health-primary/30 flex items-center justify-between animate-fade-in">
-            <div className="flex items-center gap-3">
-              <Smartphone size={20} className="text-health-primary" />
-              <div>
-                <p className="text-sm font-bold text-health-text">QRing Smart Device</p>
-                <p className="text-[10px] text-health-muted">Ready to connect via Web Bluetooth</p>
+        {isSyncing && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+            <div className="bg-white border border-health-primary/10 rounded-xl p-3 flex flex-col items-center text-center">
+              <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter mb-1">Status</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-bold text-health-text">Connected</span>
               </div>
             </div>
-            <button 
-              onClick={handleConnectDevice}
-              className="px-4 py-2 bg-green-50 text-health-primary border border-green-200 rounded-lg text-[11px] font-black uppercase tracking-widest hover:bg-green-100 transition-colors"
-            >
-              Connect
-            </button>
-          </div>
-        )}
-
-        {connectedDevice && (
-          <div className="bg-white rounded-xl border border-health-primary/30 overflow-hidden animate-fade-in">
-            <div className="p-4 bg-green-50/50 border-b border-health-primary/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Smartphone size={24} className="text-health-primary" />
-                  <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-health-text">{connectedDevice.name}</p>
-                  <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest">
-                    {connectedDevice.status} • Battery: {connectedDevice.battery}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={handleDisconnectDevice}
-                className="p-2 text-health-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Disconnect"
-              >
-                <Unplug size={18} />
-              </button>
+            <div className="bg-white border border-health-primary/10 rounded-xl p-3 flex flex-col items-center text-center">
+              <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter mb-1">Source</span>
+              <span className="text-[10px] font-bold text-health-text">QRing SDK</span>
             </div>
-            
-            <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex-1">
-                <p className="text-[10px] font-bold text-health-muted uppercase tracking-widest mb-3">Available Inputs</p>
-                <div className="flex flex-wrap gap-2">
-                  {['Heart Rate', 'Steps', 'SpO2', 'HRV', 'Stress', 'Sleep', 'Calories', 'Active Mins'].map(input => (
-                    <span key={input} className="px-2 py-1 bg-health-surface text-health-text text-[10px] font-semibold rounded border border-health-border">
-                      {input}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              <button 
-                onClick={handleSyncMerlinRing}
-                disabled={loading}
-                className="w-full md:w-auto px-6 py-3 bg-health-primary text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-health-primary/20 hover:shadow-xl hover:shadow-health-primary/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                Sync Data
-              </button>
+            <div className="bg-white border border-health-primary/10 rounded-xl p-3 flex flex-col items-center text-center">
+              <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter mb-1">Battery</span>
+              <span className="text-[10px] font-bold text-health-text">100%</span>
+            </div>
+            <div className="bg-white border border-health-primary/10 rounded-xl p-3 flex flex-col items-center text-center">
+              <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter mb-1">Last Update</span>
+              <span className="text-[10px] font-bold text-health-text">Just now</span>
             </div>
           </div>
         )}

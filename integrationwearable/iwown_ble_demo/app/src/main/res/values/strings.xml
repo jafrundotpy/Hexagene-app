@@ -93,7 +93,7 @@
     <string name="blood_setting">blood</string>
     <string name="setting_date">Date format</string>
     <string name="setting_all_measure">All measure</string>
-    <string name="setting_data_upload_url">Data Upload Address</string>
+    <string name="setting_data_upload_url">HexaGene Cloud Sync</string>
     <string name="setting_unit">Unit of measurement</string>
     <string name="setting_weather">Unit of Weather</string>
     <string name="setting_roll">Palming gestures</string>
@@ -443,8 +443,8 @@
     <string name="prox_cali">prox_cali</string>
 
     <!-- 数据上传URL -->
-    <string name="input_url">Please enter the address</string>
-    <string name="url_send_success">Address sent successfully</string>
-    <string name="url_too_long">The address length is too long</string>
+    <string name="input_url">Enter User Email for Sync</string>
+    <string name="url_send_success">Email saved. Sync active.</string>
+    <string name="url_too_long">Email address is too long</string>
 
 </resources>

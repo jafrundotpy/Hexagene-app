@@ -75,7 +75,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static int MY_PERMISSIONS_REQUEST_BLUETOOTH_SCAN = 101;
 
 
-    private com.zeroner.bledemo.bridge.HexaGeneBridgeServer bridgeServer;
+    private com.zeroner.bledemo.bridge.HexaGeneSyncClient syncClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,9 +97,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         getSupportFragmentManager().beginTransaction().add(R.id.main_frame_layout,itemFragment).commit();
 
         try {
-            bridgeServer = new com.zeroner.bledemo.bridge.HexaGeneBridgeServer();
-            bridgeServer.start();
-            Log.i("HexaGeneBridge", "Bridge server started on port 8080");
+            syncClient = new com.zeroner.bledemo.bridge.HexaGeneSyncClient(this);
+            syncClient.start();
+            Log.i("HexaGeneSync", "Cloud Sync Client started");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -108,8 +108,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (bridgeServer != null) {
-            bridgeServer.stop();
+        if (syncClient != null) {
+            syncClient.stop();
         }
     }
 

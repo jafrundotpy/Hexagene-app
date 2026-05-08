@@ -23,14 +23,14 @@ class DataUploadUrlSettingActivity : AppCompatActivity() {
         val edt = findViewById<EditText>(R.id.edt_data_upload_url)
         val btnSend = findViewById<Button>(R.id.btn_data_upload_url)
         btnSend.setOnClickListener {
-            val url = edt.text.toString()
-            if (url.isNotEmpty()) {
-                if (url.length < 95) {
-                    val bytes = SuperBleSDK.getSDKSendBluetoothCmdImpl(this).setDataUploadUrl(url)
-                    BackgroundThreadManager.getInstance().addWriteData(this, bytes)
+            val email = edt.text.toString()
+            if (email.isNotEmpty()) {
+                if (email.contains("@")) {
+                    com.zeroner.bledemo.bridge.HexaGeneSyncClient.setUserEmail(this, email)
                     Toast.makeText(this, getString(R.string.url_send_success), Toast.LENGTH_LONG).show()
+                    finish()
                 } else {
-                    Toast.makeText(this, getString(R.string.url_too_long), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Please enter a valid email", Toast.LENGTH_SHORT).show()
                 }
             }
         }
