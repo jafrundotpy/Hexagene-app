@@ -58,15 +58,19 @@ export class QRingBLE {
   // ─── Connect ─────────────────────────────────────────────────────────────
 
   async connect() {
+    // 0xFFF0 is the 16-bit short UUID. Browsers handle the expansion.
+    const shortServiceId = 0xfff0; 
+
     this.device = await navigator.bluetooth.requestDevice({
       filters: [
-        { services: [SERVICE_UUID] },
+        { services: [shortServiceId] },
         { namePrefix: 'QRing' },
         { namePrefix: 'X6' },
         { namePrefix: 'Ring' },
         { namePrefix: 'RING' },
+        { namePrefix: 'Smart' }
       ],
-      optionalServices: [SERVICE_UUID],
+      optionalServices: [SERVICE_UUID, shortServiceId],
     });
 
     this.device.addEventListener('gattserverdisconnected', () => {

@@ -302,6 +302,28 @@ export default function BleConnect() {
               <BluetoothSearching size={20} />
               Connect QRing
             </button>
+            
+            <div className="pt-4 border-t border-health-border w-full text-left">
+              <details className="group">
+                <summary className="text-[11px] font-black uppercase tracking-widest text-health-muted cursor-pointer hover:text-health-primary flex items-center gap-2">
+                  <AlertCircle size={12} />
+                  Device not showing up?
+                </summary>
+                <div className="mt-3 space-y-3 animate-fade-in">
+                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      <span className="font-bold">1. Disconnect from other phones:</span> If your ring is currently connected to its official app or your other phone, it will <span className="font-bold">not</span> appear here. Turn off Bluetooth on your other phone temporarily.
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <p className="text-[11px] text-blue-800 leading-relaxed">
+                      <span className="font-bold">2. Android Chrome Required:</span> Web Bluetooth works best in Chrome on Android. It is not supported in Safari on iPhone or regular browser apps on many devices.
+                    </p>
+                  </div>
+                </div>
+              </details>
+            </div>
+
             <p className="text-[10px] text-health-muted">
               Works on Android Chrome · Desktop Chrome · Edge
             </p>
