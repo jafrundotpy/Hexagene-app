@@ -129,7 +129,7 @@ const Simulations = () => {
     if (!file) return;
     try {
       setUploading(true);
-      setStatusMsg("Processing biometric screenshot...");
+      setStatusMsg("Initializing AI diagnostic engine...");
       const formData = new FormData();
       formData.append("file", file);
       
@@ -166,7 +166,7 @@ const Simulations = () => {
 
     try {
       setLoading(true);
-      setStatusMsg("Calculating Hexa Health Score...");
+      setStatusMsg("Connecting to clinical analysis engine...");
       
       // Format input for live-sync endpoint
       const payload = {

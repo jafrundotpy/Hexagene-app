@@ -62,21 +62,21 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY missing")
 
 # =====================================================
-# BOSS ENGINE IMPORTS
+# ENGINE & CORE LOGIC (LAZY LOADED)
 # =====================================================
 
 _READY = {"ok": True}
 
-from schemas import (
-    HealthResponse,
-    IntakeInput,
-    IntakeResponse,
-    PatientInput,
-    VersionResponse,
-)
-from engine_demo import BUILD, ENGINE, KERNEL_DESC, VERSION, patient_report
-from intake_demo import merge_patient
-from clinical_report_demo import generate_clinical_report
+# These will be initialized in lifespan to prevent blocking app startup
+ENGINE_STAGING = {}
+
+def get_engine():
+    if not ENGINE_STAGING:
+        from engine_demo import ENGINE, VERSION, BUILD
+        ENGINE_STAGING["engine"] = ENGINE
+        ENGINE_STAGING["version"] = VERSION
+        ENGINE_STAGING["build"] = BUILD
+    return ENGINE_STAGING["engine"]
 
 # =====================================================
 # APP LIFECYCLE
@@ -84,11 +84,22 @@ from clinical_report_demo import generate_clinical_report
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("hexagene production starting build=%s version=%s", BUILD, VERSION)
-    if _READY["ok"]:
-        logger.info("Engine loaded successfully.")
+    # Background pre-loading of clinical engine
+    logger.info("HexaGene production engine initialization starting...")
+    try:
+        from engine_demo import ENGINE, VERSION, BUILD
+        ENGINE_STAGING["engine"] = ENGINE
+        ENGINE_STAGING["version"] = VERSION
+        ENGINE_STAGING["build"] = BUILD
+        
+        # Verify Supabase connectivity on startup
+        supabase.table("wearable_metrics").select("count", count="exact").limit(1).execute()
+        logger.info("✅ Clinical Engine & Database verified. Readiness probe passed.")
+    except Exception as e:
+        logger.error("❌ Critical Startup Error: %s", str(e))
+        
     yield
-    logger.info("hexagene shutdown")
+    logger.info("HexaGene shutdown")
 
 app = FastAPI(
     title="HexaGene API",
@@ -97,6 +108,29 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# =====================================================
+# INFRASTRUCTURE & HEALTH
+# =====================================================
+
+@app.get("/health")
+async def health_check():
+    """Lightweight readiness probe for keep-alive systems."""
+    try:
+        # Shallow check for Supabase connectivity
+        supabase.table("wearable_metrics").select("id").limit(1).execute()
+        db_status = "connected"
+    except Exception:
+        db_status = "unstable"
+
+    return {
+        "status": "ok",
+        "service": "hexagene-backend",
+        "database": db_status,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+# =====================================================
+# MIDDLEWARE
 # =====================================================
 # SAFE ERROR HANDLER
 # =====================================================
@@ -512,6 +546,9 @@ async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
         raise HTTPException(status_code=400, detail={"success": False, "message": "patient_data is required."})
 
     try:
+        from engine_demo import patient_report
+        from clinical_report_demo import generate_clinical_report
+        
         raw_report = patient_report(data)
         # Enrich with clinical analysis (Boss requirement: all 8 outputs)
         report = generate_clinical_report(raw_report)
@@ -539,6 +576,9 @@ async def v2_score(payload: Union[AnalysisRequest, PatientInput], key_data=Depen
         raise HTTPException(status_code=400, detail="empty request body")
 
     try:
+        from engine_demo import patient_report
+        from clinical_report_demo import generate_clinical_report
+        
         raw_report = patient_report(body)
         # Enrich with clinical analysis (Boss requirement: all 8 outputs)
         report = generate_clinical_report(raw_report)
@@ -558,6 +598,7 @@ async def intake(payload: IntakeInput, key_data=Depends(verify_api_key)):
     if not body:
         raise HTTPException(status_code=400, detail="empty request body")
         
+    from intake_demo import merge_patient
     result = merge_patient(body)
     _increment_usage(key_data)
     return IntakeResponse(**result)
@@ -572,6 +613,7 @@ async def report_enrichment(engine_output: dict[str, Any], key_data=Depends(veri
     if "engine" not in engine_output and "version" not in engine_output:
         raise HTTPException(status_code=400, detail="payload does not look like an engine output")
         
+    from clinical_report_demo import generate_clinical_report
     _increment_usage(key_data)
     return generate_clinical_report(engine_output)
 
@@ -614,6 +656,9 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
     logger.info(f"Engine Input (patient_data): {patient_data}")
     
     try:
+        from engine_demo import patient_report
+        from clinical_report_demo import generate_clinical_report
+        
         raw_report = patient_report(patient_data)
         # Enrich with clinical analysis (Boss requirement: all 8 outputs)
         report = generate_clinical_report(raw_report)
@@ -654,6 +699,9 @@ async def live_sync(request: WearableScoreRequest, key_data=Depends(verify_api_k
     logger.info(f"Live Sync Engine Input: {patient_data}")
     
     try:
+        from engine_demo import patient_report
+        from clinical_report_demo import generate_clinical_report
+        
         raw_report = patient_report(patient_data)
         report = generate_clinical_report(raw_report)
         report["live_sync_active"] = True

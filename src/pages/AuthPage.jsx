@@ -38,7 +38,7 @@ const AuthPage = ({ mode = "login" }) => {
       }
   
       setLoading(true);
-      setLoadingMessage(isActive ? "Creating account..." : "Logging in...");
+      setLoadingMessage("Connecting to clinical analysis engine...");
   
       const performRequest = async (retries = 2) => {
         try {
@@ -61,7 +61,7 @@ const AuthPage = ({ mode = "login" }) => {
           // Check for "Server starting up" error (common on Render free tier)
           if (response.status === 503 || (data.message && data.message.toLowerCase().includes("starting up"))) {
             if (retries > 0) {
-              setLoadingMessage(`Server is waking up... retrying (${3 - retries}/2)`);
+              setLoadingMessage("Preparing secure health workspace...");
               await new Promise(r => setTimeout(r, 3000));
               return performRequest(retries - 1);
             }
@@ -81,7 +81,7 @@ const AuthPage = ({ mode = "login" }) => {
             localStorage.setItem("token", token);
             login({ name: data.user?.name || email.split("@")[0], email }, token);
             
-            setLoadingMessage("Authentication successful! Redirecting...");
+            setLoadingMessage("Clinical workspace verified. Redirecting...");
             setTimeout(() => navigate("/dashboard/simulations", { replace: true }), 500);
           } else {
             if (response.status === 400) {
