@@ -70,10 +70,33 @@ export class QRingBLE {
       if (this.onConnectionChange) this.onConnectionChange(false, null);
     });
 
-    this.server  = await this.device.gatt.connect();
-    const svc    = await this.server.getPrimaryService(SERVICE_UUID);
-    this.txChar  = await svc.getCharacteristic(TX_UUID);
-    this.rxChar  = await svc.getCharacteristic(RX_UUID);
+    this.server = await this.device.gatt.connect();
+    
+    // 🔍 Smart Service Discovery
+    // Some rings advertise 0xFFF0 as a secondary service or use a hidden variant.
+    // We try the official UUID first, then iterate all services to find our TX/RX characteristics.
+    try {
+      this.service = await this.server.getPrimaryService(SERVICE_UUID);
+    } catch (e) {
+      console.warn("Primary service UUID 0xFFF0 not found, scanning all services...");
+      const services = await this.server.getPrimaryServices();
+      for (const s of services) {
+        try {
+          // Check if this service contains the TX characteristic (0xFFF6)
+          await s.getCharacteristic(TX_UUID);
+          this.service = s;
+          console.log("Found compatible QRing service:", s.uuid);
+          break;
+        } catch (err) { continue; }
+      }
+    }
+
+    if (!this.service) {
+      throw new Error("No compatible QRing service found. Please ensure you are connecting to an X6 Smart Ring.");
+    }
+
+    this.txChar = await this.service.getCharacteristic(TX_UUID);
+    this.rxChar = await this.service.getCharacteristic(RX_UUID);
 
     this.rxChar.addEventListener('characteristicvaluechanged', (e) => {
       this._onRx(new Uint8Array(e.target.value.buffer));
