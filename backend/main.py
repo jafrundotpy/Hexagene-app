@@ -61,22 +61,27 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY missing")
 
-# =====================================================
-# ENGINE & CORE LOGIC (LAZY LOADED)
-# =====================================================
+from schemas import (
+    HealthResponse,
+    IntakeInput,
+    IntakeResponse,
+    PatientInput,
+    VersionResponse,
+)
+from engine_demo import VERSION, ENGINE, KERNEL_DESC, BUILD
 
 _READY = {"ok": True}
 
-# These will be initialized in lifespan to prevent blocking app startup
+# Heavy components are still lazy-loaded to optimize startup latency
 ENGINE_STAGING = {}
 
-def get_engine():
+def get_engine_data():
     if not ENGINE_STAGING:
-        from engine_demo import ENGINE, VERSION, BUILD
-        ENGINE_STAGING["engine"] = ENGINE
-        ENGINE_STAGING["version"] = VERSION
-        ENGINE_STAGING["build"] = BUILD
-    return ENGINE_STAGING["engine"]
+        from engine_demo import ENGINE as E, VERSION as V, BUILD as B
+        ENGINE_STAGING["engine"] = E
+        ENGINE_STAGING["version"] = V
+        ENGINE_STAGING["build"] = B
+    return ENGINE_STAGING
 
 # =====================================================
 # APP LIFECYCLE
