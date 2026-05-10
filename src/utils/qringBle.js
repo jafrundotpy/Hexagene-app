@@ -1,369 +1,166 @@
 /**
- * QRing X6 BLE Driver — Web Bluetooth Implementation
- * Shenzhen Youhong Technology Co., Ltd. Protocol v1.1
- *
- * Service UUID : 0xFFF0
- * TX (App→Ring): 0xFFF6  (write)
- * RX (Ring→App): 0xFFF7  (notify)
- *
- * Packet format: [CMD(1), PAYLOAD(14), CRC(1)] = 16 bytes
- * CRC = sum(bytes[0..14]) & 0xFF
+ * HexaGene Official Wearable BLE Engine (X3 Protocol)
+ * 
+ * Protocol Specification:
+ * - 16-byte command packets
+ * - CRC-8 checksum: sum of first 15 bytes & 0xFF
+ * - Service: 0xFFF0
+ * - TX: 0xFFF6 (Write)
+ * - RX: 0xFFF7 (Notify)
  */
 
 const SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb';
-const TX_UUID      = '0000fff6-0000-1000-8000-00805f9b34fb'; // App → Ring
-const RX_UUID      = '0000fff7-0000-1000-8000-00805f9b34fb'; // Ring → App
+const TX_UUID      = '0000fff6-0000-1000-8000-00805f9b34fb';
+const RX_UUID      = '0000fff7-0000-1000-8000-00805f9b34fb';
 
-export const CMD = {
-  SET_TIME          : 0x01,
-  GET_TIME          : 0x41,
-  SET_USER_INFO     : 0x02,
-  READ_BATTERY      : 0x13,
-  REALTIME_MODE     : 0x09, // Steps/HR/SpO2/Temp streaming (31 bytes/sec)
-  MEASUREMENT       : 0x28, // HR / SpO2 / HRV measurement control
-  GET_HRV_HISTORY   : 0x56,
-  GET_HR_HISTORY    : 0x55,
-  GET_SPO2_HISTORY  : 0x66,
-  GET_STEPS_TOTAL   : 0x51,
-  GET_SLEEP_HISTORY : 0x53,
-  MCU_RESET         : 0x2E,
-};
-
-function calcCRC(pkt) {
-  let s = 0;
-  for (let i = 0; i < 15; i++) s += pkt[i];
-  return s & 0xFF;
+/**
+ * Calculate X3 CRC-8 Checksum
+ * @param {Uint8Array} pkt 16-byte packet
+ * @returns {number} 8-bit checksum
+ */
+export function calculateCRC(pkt) {
+  let sum = 0;
+  for (let i = 0; i < 15; i++) {
+    sum += pkt[i];
+  }
+  return sum & 0xFF;
 }
 
-export function buildPacket(cmd, payload = []) {
+/**
+ * Build a standard 16-byte X3 command packet
+ */
+export function buildPacket(command, payload = []) {
   const pkt = new Uint8Array(16);
-  pkt[0] = cmd;
-  for (let i = 0; i < Math.min(payload.length, 14); i++) pkt[i + 1] = payload[i];
-  pkt[15] = calcCRC(pkt);
+  pkt[0] = command;
+  for (let i = 0; i < Math.min(payload.length, 14); i++) {
+    pkt[i + 1] = payload[i];
+  }
+  pkt[15] = calculateCRC(pkt);
   return pkt;
 }
 
-export class QRingBLE {
+export class X3BleEngine {
   constructor() {
-    this.device           = null;
-    this.server           = null;
-    this.txChar           = null;
-    this.rxChar           = null;
-    this.onRealtimeData   = null;  // (parsedMetrics) → live UI update
-    this.onConnectionChange = null; // (connected, deviceName)
-    this._responseResolve = null;
-    this._variableCollector = null;
+    this.device = null;
+    this.server = null;
+    this.service = null;
+    this.txChar = null;
+    this.rxChar = null;
+    
+    this.onData = null;       // (parsedData) -> void
+    this.onRawHex = null;     // (hexString) -> void
+    this.onStatus = null;     // (statusString) -> void
+    this.onConnection = null; // (connected, name) -> void
   }
-
-  // ─── Connect ─────────────────────────────────────────────────────────────
 
   async connect() {
-    // 0xFFF0 is the 16-bit short UUID. Browsers handle the expansion.
-    const shortServiceId = 0xfff0; 
-
-    this.device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        shortServiceId, 
-        SERVICE_UUID,
-        '00001530-0000-1000-8000-00805f9b34fb',
-        '0000fe59-0000-1000-8000-00805f9b34fb',
-        '0000ffe0-0000-1000-8000-00805f9b34fb',
-        '0000fee7-0000-1000-8000-00805f9b34fb'
-      ],
-    });
-
-    this.device.addEventListener('gattserverdisconnected', () => {
-      if (this.onConnectionChange) this.onConnectionChange(false, null);
-    });
-
-    this.server = await this.device.gatt.connect();
-    
-    // 🔍 Smart Service Discovery
-    // Some rings advertise 0xFFF0 as a secondary service or use a hidden variant.
-    // We try the official UUID first, then iterate all services to find our TX/RX characteristics.
     try {
+      this.logStatus("Requesting QRing/X3 device...");
+      this.device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [0xFFF0] }],
+        optionalServices: [SERVICE_UUID]
+      });
+
+      this.device.addEventListener('gattserverdisconnected', () => {
+        this.logStatus("Disconnected");
+        if (this.onConnection) this.onConnection(false, null);
+      });
+
+      this.logStatus("Connecting to GATT Server...");
+      this.server = await this.device.gatt.connect();
+
+      this.logStatus("Discovering X3 Service...");
       this.service = await this.server.getPrimaryService(SERVICE_UUID);
-    } catch (e) {
-      console.warn("Primary service UUID 0xFFF0 not found, scanning all services...");
-      const services = await this.server.getPrimaryServices();
-      const possibleChars = [
-        TX_UUID, 
-        '8082caa8-41a6-4021-91c6-56f9b954cc34',
-        '0000fff6-0000-1000-8000-00805f9b34fb'
-      ];
-      
-      for (const s of services) {
-        for (const charUuid of possibleChars) {
-          try {
-            await s.getCharacteristic(charUuid);
-            this.service = s;
-            console.log("Found compatible QRing service via characteristic:", s.uuid, "at char:", charUuid);
-            break;
-          } catch (err) { continue; }
-        }
-        if (this.service) break;
-      }
-    }
 
-    if (!this.service) {
-      throw new Error("No compatible QRing service found. Please ensure you are connecting to an X6 Smart Ring.");
-    }
+      this.logStatus("Discovering Characteristics...");
+      this.txChar = await this.service.getCharacteristic(TX_UUID);
+      this.rxChar = await this.service.getCharacteristic(RX_UUID);
 
-    // Flexible characteristic assignment
-    const txUuids = [TX_UUID, '8082caa8-41a6-4021-91c6-56f9b954cc34', '0000fff6-0000-1000-8000-00805f9b34fb'];
-    const rxUuids = [RX_UUID, '724249f0-5ec3-4b5f-8804-42345af08651', '0000fff7-0000-1000-8000-00805f9b34fb'];
+      this.logStatus("Subscribing to RX Notifications...");
+      this.rxChar.addEventListener('characteristicvaluechanged', (event) => {
+        this._handleRx(new Uint8Array(event.target.value.buffer));
+      });
+      await this.rxChar.startNotifications();
 
-    for (const uuid of txUuids) {
-      try { this.txChar = await this.service.getCharacteristic(uuid); break; } catch(e) {}
-    }
-    for (const uuid of rxUuids) {
-      try { this.rxChar = await this.service.getCharacteristic(uuid); break; } catch(e) {}
-    }
+      this.logStatus("Connection established");
+      if (this.onConnection) this.onConnection(true, this.device.name);
 
-    if (!this.txChar || !this.rxChar) {
-      throw new Error("Found service but failed to find data channels (TX/RX).");
-    }
+      // Phase 4: Automatically send realtime streaming command (0x09)
+      await this.enableRealtimeStreaming();
 
-    this.rxChar.addEventListener('characteristicvaluechanged', (e) => {
-      this._onRx(new Uint8Array(e.target.value.buffer));
-    });
-    await this.rxChar.startNotifications();
-
-    if (this.onConnectionChange) this.onConnectionChange(true, this.device.name);
-    return this.device.name;
-  }
-
-  disconnect() {
-    if (this.device?.gatt?.connected) this.device.gatt.disconnect();
-  }
-
-  get isConnected() {
-    return !!(this.device?.gatt?.connected);
-  }
-
-  // ─── Internal RX handler ─────────────────────────────────────────────────
-
-  _onRx(data) {
-    const cmd = data[0];
-
-    // 1. Real-time streaming packets (0x09) → live metrics callback
-    if (cmd === 0x09 && data.length >= 26) {
-      if (this.onRealtimeData) this.onRealtimeData(parseRealtimeUpdate(data));
-    }
-
-    // 2. Variable-length multi-packet responses (history data)
-    if (this._variableCollector) {
-      const { cmdByte, packets, resolve, timer } = this._variableCollector;
-      if (cmd === cmdByte) {
-        if (data[1] === 0xFF) {
-          // End-of-data marker
-          clearTimeout(timer);
-          this._variableCollector = null;
-          resolve(packets);
-        } else {
-          packets.push(data);
-        }
-        return;
-      }
-    }
-
-    // 3. Single 16-byte command responses
-    if (this._responseResolve) {
-      this._responseResolve(data);
-      this._responseResolve = null;
+      return true;
+    } catch (err) {
+      this.logStatus(`Connection failed: ${err.message}`);
+      throw err;
     }
   }
 
-  // ─── Write helpers ───────────────────────────────────────────────────────
+  async disconnect() {
+    if (this.device && this.device.gatt.connected) {
+      await this.device.gatt.disconnect();
+    }
+  }
 
-  async _write(pkt) {
+  async enableRealtimeStreaming() {
+    this.logStatus("Activating Realtime Stream (0x09)...");
+    // 0x09 01 01 ... CRC
+    // 01 01 enables steps and temperature
+    const pkt = buildPacket(0x09, [0x01, 0x01]);
     await this.txChar.writeValueWithResponse(pkt);
   }
 
-  _waitSingle(ms = 3000) {
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => {
-        this._responseResolve = null;
-        reject(new Error('BLE timeout'));
-      }, ms);
-      this._responseResolve = (data) => { clearTimeout(t); resolve(data); };
-    });
+  _handleRx(data) {
+    // Phase 6: Raw HEX Packet Debug
+    const hex = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    if (this.onRawHex) this.onRawHex(hex);
+
+    const cmd = data[0];
+    
+    // Phase 3 & 4: Parse Realtime Packet (0x09 is usually 31 bytes or 16 depending on firmware)
+    // Most X3 rings use 31-byte response for 0x09, but the 16-byte format is also common for status.
+    if (cmd === 0x09) {
+      this._parseRealtime(data);
+    } else if (cmd === 0x13) {
+      this._parseBattery(data);
+    }
   }
 
-  async _sendRecv(cmd, payload = [], ms = 3000) {
-    const promise = this._waitSingle(ms);
-    await this._write(buildPacket(cmd, payload));
-    return promise;
+  _parseRealtime(data) {
+    if (data.length < 16) return;
+
+    const metrics = {
+      timestamp: Date.now(),
+      steps: 0,
+      heartRate: null,
+      spo2: null,
+      temperature: null,
+    };
+
+    if (data.length >= 26) {
+      // 31-byte variant
+      metrics.steps = (data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24)) >>> 0;
+      metrics.heartRate = data[22] > 0 ? data[22] : null;
+      const tempRaw = data[23] | (data[24] << 8);
+      metrics.temperature = tempRaw > 0 ? (tempRaw / 10).toFixed(1) : null;
+      metrics.spo2 = data[25] > 0 ? data[25] : null;
+    } else {
+      // 16-byte variant (fallback)
+      metrics.steps = (data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24)) >>> 0;
+    }
+
+    if (this.onData) this.onData(metrics);
   }
 
-  _collectMulti(cmdByte, ms = 4000) {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this._variableCollector = null;
-        resolve([]);
-      }, ms);
-      this._variableCollector = { cmdByte, packets: [], resolve, timer };
-    });
+  _parseBattery(data) {
+    const battery = {
+      level: data[1],
+      charging: data[2] === 1
+    };
+    if (this.onData) this.onData({ battery });
   }
 
-  // ─── Public API ──────────────────────────────────────────────────────────
-
-  /** Sync ring clock to device time */
-  async setTime() {
-    const n = new Date();
-    const p = [
-      n.getFullYear() % 100, n.getMonth() + 1, n.getDate(),
-      n.getHours(), n.getMinutes(), n.getSeconds(),
-      0, 0, 0, 0, 0, 0, 0, 0,
-    ];
-    return this._sendRecv(CMD.SET_TIME, p);
+  logStatus(msg) {
+    console.log(`[X3-BLE] ${msg}`);
+    if (this.onStatus) this.onStatus(msg);
   }
-
-  /** Write user profile to ring (used for calorie/distance accuracy) */
-  async setUserInfo({ gender = 1, age = 30, height = 170, weight = 70 } = {}) {
-    return this._sendRecv(CMD.SET_USER_INFO, [gender & 0xFF, age & 0xFF, height & 0xFF, weight & 0xFF]);
-  }
-
-  /** Read battery level → { level: 0-100, charging: bool } */
-  async readBattery() {
-    const r = await this._sendRecv(CMD.READ_BATTERY);
-    if (r[0] === CMD.READ_BATTERY) return { level: r[1], charging: r[2] === 1 };
-    return { level: 0, charging: false };
-  }
-
-  /**
-   * Enable real-time streaming mode (0x09).
-   * Ring pushes a 31-byte packet every second containing:
-   *   HR, SpO2, Steps, Calories, Distance, Temperature.
-   * Results delivered to this.onRealtimeData callback.
-   */
-  async startRealtimeMode() {
-    // AA=1 enable steps, BB=1 enable temperature
-    await this._write(buildPacket(CMD.REALTIME_MODE, [1, 1]));
-  }
-
-  async stopRealtimeMode() {
-    await this._write(buildPacket(CMD.REALTIME_MODE, [0, 0]));
-  }
-
-  /** Start on-demand HR measurement. SpO2+HR visible in realtime stream. */
-  async startHRMeasurement(durationSec = 30) {
-    return this._sendRecv(CMD.MEASUREMENT, [0x02, 0x01, 0x00, 0x00, durationSec & 0xFF, (durationSec >> 8) & 0xFF]);
-  }
-
-  /** Start on-demand SpO2 measurement. SpO2 visible in realtime stream. */
-  async startSpO2Measurement(durationSec = 30) {
-    return this._sendRecv(CMD.MEASUREMENT, [0x03, 0x01, 0x00, 0x00, durationSec & 0xFF, (durationSec >> 8) & 0xFF]);
-  }
-
-  /** Start HRV/stress measurement (60s recommended). Results → 0x56 history. */
-  async startHRVMeasurement(durationSec = 60) {
-    return this._sendRecv(CMD.MEASUREMENT, [0x01, 0x01, 0x00, 0x00, durationSec & 0xFF, (durationSec >> 8) & 0xFF]);
-  }
-
-  async stopMeasurement(type) {
-    // type: 0x01=HRV, 0x02=HR, 0x03=SpO2
-    return this._sendRecv(CMD.MEASUREMENT, [type, 0x00]);
-  }
-
-  /** Read latest HRV record → { hrv, heartRate, fatigue, systolic, diastolic } */
-  async getLatestHRV() {
-    const collectP = this._collectMulti(CMD.GET_HRV_HISTORY, 4000);
-    await this._write(buildPacket(CMD.GET_HRV_HISTORY, [0x00]));
-    return collectP;
-  }
-
-  /** Read latest heart rate record → [ { heartRate } ] */
-  async getLatestHR() {
-    const collectP = this._collectMulti(CMD.GET_HR_HISTORY, 4000);
-    await this._write(buildPacket(CMD.GET_HR_HISTORY, [0x00]));
-    return collectP;
-  }
-
-  /** Read latest SpO2 record → [ { spo2 } ] */
-  async getLatestSpO2() {
-    const collectP = this._collectMulti(CMD.GET_SPO2_HISTORY, 4000);
-    await this._write(buildPacket(CMD.GET_SPO2_HISTORY, [0x00]));
-    return collectP;
-  }
-
-  /** Read today's total step count → { steps, calories, distance, exerciseMinutes } */
-  async getTotalSteps() {
-    const collectP = this._collectMulti(CMD.GET_STEPS_TOTAL, 4000);
-    await this._write(buildPacket(CMD.GET_STEPS_TOTAL, [0x00]));
-    return collectP;
-  }
-}
-
-// ─── Parser functions (exported for use in UI components) ─────────────────────
-
-/** Parse 0x09 real-time 31-byte packet */
-export function parseRealtimeUpdate(data) {
-  if (!data || data.length < 26 || data[0] !== 0x09) return null;
-  const steps     = readU32LE(data, 1);
-  const calRaw    = readU32LE(data, 5);
-  const distRaw   = readU32LE(data, 9);
-  const hr        = data[22];
-  const tempRaw   = readU16LE(data, 23);
-  const spo2      = data[25];
-  return {
-    steps,
-    calories       : +(calRaw / 100).toFixed(2),
-    distance       : +(distRaw / 100).toFixed(2),
-    heartRate      : hr > 30 && hr < 220 ? hr : null,
-    temperature    : tempRaw > 0 ? +(tempRaw / 10).toFixed(1) : null,
-    spo2           : spo2 > 50 ? spo2 : null,
-  };
-}
-
-/** Parse 0x13 battery response */
-export function parseBattery(data) {
-  if (!data || data[0] !== 0x13) return null;
-  return { level: data[1], charging: data[2] === 1 };
-}
-
-/** Parse 0x56 HRV history packets array → latest entry */
-export function parseHRVPackets(packets) {
-  if (!packets?.length) return null;
-  const p = packets[0]; // most recent
-  if (p.length < 15) return null;
-  return {
-    hrv       : p[9],   // HRV value
-    heartRate : p[11],  // heart rate
-    fatigue   : p[12],  // stress/fatigue 0-100
-    systolic  : p[13],  // BP systolic
-    diastolic : p[14],  // BP diastolic
-  };
-}
-
-/** Parse 0x55 HR history packets → latest HR */
-export function parseHRPackets(packets) {
-  if (!packets?.length || packets[0].length < 10) return null;
-  return { heartRate: packets[0][9] };
-}
-
-/** Parse 0x66 SpO2 history packets → latest SpO2 */
-export function parseSpO2Packets(packets) {
-  if (!packets?.length || packets[0].length < 10) return null;
-  return { spo2: packets[0][9] };
-}
-
-/** Parse 0x51 total steps packets → today's totals */
-export function parseStepsPackets(packets) {
-  if (!packets?.length || packets[0].length < 21) return null;
-  const p = packets[0];
-  return {
-    steps          : readU32LE(p, 5),
-    exerciseMinutes: Math.round(readU32LE(p, 9) / 60),
-    distance       : +(readU32LE(p, 13) / 100).toFixed(2),
-    calories       : +(readU32LE(p, 17) / 100).toFixed(2),
-  };
-}
-
-function readU32LE(d, o) {
-  return ((d[o] | (d[o+1]<<8) | (d[o+2]<<16) | (d[o+3]<<24)) >>> 0);
-}
-function readU16LE(d, o) {
-  return d[o] | (d[o+1] << 8);
 }
