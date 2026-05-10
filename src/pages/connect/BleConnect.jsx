@@ -12,18 +12,18 @@ import API_URL from "../../api/config";
 
 // ─── State machine ────────────────────────────────────────────────────────────
 const PHASE = {
-  IDLE       : "idle",
-  CONNECTING : "connecting",
-  CONNECTED  : "connected",
-  MEASURING  : "measuring",
-  READING    : "reading",
-  READY      : "ready",
-  EXPORTING  : "exporting",
-  DONE       : "done",
-  ERROR      : "error",
+  IDLE: "idle",
+  CONNECTING: "connecting",
+  CONNECTED: "connected",
+  MEASURING: "measuring",
+  READING: "reading",
+  READY: "ready",
+  EXPORTING: "exporting",
+  DONE: "done",
+  ERROR: "error",
 };
 
-const INGEST_URL   = "https://hexagene-app.onrender.com/v2/ingest-wearable";
+const INGEST_URL = "https://hexagene-app.onrender.com/v2/ingest-wearable";
 const INGEST_TOKEN = "hexagene-ingest-2026";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -39,11 +39,10 @@ function getUserEmail() {
 // ─── Metric Card ─────────────────────────────────────────────────────────────
 function MetricPill({ icon: Icon, label, value, unit, active, color = "text-health-primary" }) {
   return (
-    <div className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-500 ${
-      active
+    <div className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all duration-500 ${active
         ? "bg-white border-health-primary/30 shadow-lg shadow-health-primary/10"
         : "bg-health-surface/50 border-health-border opacity-50"
-    }`}>
+      }`}>
       <div className={`mb-2 ${active ? color : "text-health-muted"}`}>
         <Icon size={22} />
       </div>
@@ -58,18 +57,18 @@ function MetricPill({ icon: Icon, label, value, unit, active, color = "text-heal
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function BleConnect() {
-  const [phase, setPhase]       = useState(PHASE.IDLE);
+  const [phase, setPhase] = useState(PHASE.IDLE);
   const [deviceName, setDeviceName] = useState(null);
-  const [battery, setBattery]   = useState(null);
-  const [metrics, setMetrics]   = useState({
+  const [battery, setBattery] = useState(null);
+  const [metrics, setMetrics] = useState({
     heartRate: null, spo2: null, hrv: null, fatigue: null,
     steps: null, calories: null, distance: null, temperature: null,
   });
   const [statusMsg, setStatusMsg] = useState(null);
   const [measureTime, setMeasureTime] = useState(0);
   const [exportSuccess, setExportSuccess] = useState(false);
-  const bleRef     = useRef(null);
-  const timerRef   = useRef(null);
+  const bleRef = useRef(null);
+  const timerRef = useRef(null);
 
   const userEmail = getUserEmail();
 
@@ -91,7 +90,7 @@ export default function BleConnect() {
 
     try {
       setPhase(PHASE.CONNECTING);
-      setStatusMsg("Opening Bluetooth menu... Pick your QRing/X6 from the list.");
+      setStatusMsg("Scanning for QRing X6...");
 
       const ble = new QRingBLE();
       bleRef.current = ble;
@@ -109,11 +108,11 @@ export default function BleConnect() {
         if (!data) return;
         setMetrics(prev => ({
           ...prev,
-          heartRate  : data.heartRate   ?? prev.heartRate,
-          spo2       : data.spo2        ?? prev.spo2,
-          steps      : data.steps       ?? prev.steps,
-          calories   : data.calories    ?? prev.calories,
-          distance   : data.distance    ?? prev.distance,
+          heartRate: data.heartRate ?? prev.heartRate,
+          spo2: data.spo2 ?? prev.spo2,
+          steps: data.steps ?? prev.steps,
+          calories: data.calories ?? prev.calories,
+          distance: data.distance ?? prev.distance,
           temperature: data.temperature ?? prev.temperature,
         }));
       };
@@ -181,16 +180,16 @@ export default function BleConnect() {
         ble.getTotalSteps(),
       ]);
 
-      const hrv  = parseHRVPackets(hrvPackets);
+      const hrv = parseHRVPackets(hrvPackets);
       const spo2 = parseSpO2Packets(spo2Packets);
       const steps = parseStepsPackets(stepsPackets);
 
       setMetrics(prev => ({
         ...prev,
-        hrv    : hrv?.hrv       ?? prev.hrv,
-        fatigue: hrv?.fatigue   ?? prev.fatigue,
-        spo2   : spo2?.spo2     ?? prev.spo2,
-        steps  : steps?.steps   ?? prev.steps,
+        hrv: hrv?.hrv ?? prev.hrv,
+        fatigue: hrv?.fatigue ?? prev.fatigue,
+        spo2: spo2?.spo2 ?? prev.spo2,
+        steps: steps?.steps ?? prev.steps,
         calories: steps?.calories ?? prev.calories,
       }));
 
@@ -212,17 +211,17 @@ export default function BleConnect() {
     setStatusMsg("Uploading to HexaGene Cloud...");
 
     const payload = {
-      email             : userEmail,
-      ingest_token      : INGEST_TOKEN,
-      source            : "qring_web_bluetooth",
+      email: userEmail,
+      ingest_token: INGEST_TOKEN,
+      source: "qring_web_bluetooth",
       resting_heart_rate: metrics.heartRate,
-      spo2              : metrics.spo2,
-      hrv               : metrics.hrv,
-      stress_score      : metrics.fatigue,
-      daily_steps       : metrics.steps,
-      calories_burned   : metrics.calories,
-      avg_sleep_hours   : null,
-      active_minutes    : null,
+      spo2: metrics.spo2,
+      hrv: metrics.hrv,
+      stress_score: metrics.fatigue,
+      daily_steps: metrics.steps,
+      calories_burned: metrics.calories,
+      avg_sleep_hours: null,
+      active_minutes: null,
     };
 
     // Remove null fields
@@ -230,9 +229,9 @@ export default function BleConnect() {
 
     try {
       const res = await fetch(INGEST_URL, {
-        method : "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body   : JSON.stringify(payload),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -273,11 +272,10 @@ export default function BleConnect() {
 
         {/* Status Message */}
         {statusMsg && (
-          <div className={`p-4 rounded-xl border flex items-center gap-3 text-sm ${
-            statusMsg.includes("failed") || statusMsg.includes("Failed") || phase === PHASE.ERROR
+          <div className={`p-4 rounded-xl border flex items-center gap-3 text-sm ${statusMsg.includes("failed") || statusMsg.includes("Failed") || phase === PHASE.ERROR
               ? "bg-red-50 border-red-100 text-red-600"
               : "bg-green-50 border-green-100 text-health-primary"
-          }`}>
+            }`}>
             {phase === PHASE.ERROR ? <AlertCircle size={16} /> : <Zap size={16} />}
             <span className="font-bold">{statusMsg}</span>
           </div>
@@ -302,7 +300,7 @@ export default function BleConnect() {
               <BluetoothSearching size={20} />
               Connect QRing
             </button>
-            
+
             <div className="pt-4 border-t border-health-border w-full text-left">
               <details className="group">
                 <summary className="text-[11px] font-black uppercase tracking-widest text-health-muted cursor-pointer hover:text-health-primary flex items-center gap-2">
@@ -399,14 +397,14 @@ export default function BleConnect() {
 
             {/* Live Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <MetricPill icon={Heart}       label="Heart Rate"   value={metrics.heartRate}   unit="bpm"    active={!!metrics.heartRate}   color="text-red-500" />
-              <MetricPill icon={Droplets}    label="SpO2"         value={metrics.spo2}        unit="%"      active={!!metrics.spo2}        color="text-blue-500" />
-              <MetricPill icon={Brain}       label="HRV"          value={metrics.hrv}         unit="ms"     active={!!metrics.hrv}         color="text-purple-500" />
-              <MetricPill icon={Activity}    label="Stress"       value={metrics.fatigue}     unit="/100"   active={!!metrics.fatigue}     color="text-orange-500" />
-              <MetricPill icon={Zap}         label="Steps"        value={metrics.steps?.toLocaleString()} unit="steps" active={!!metrics.steps} color="text-health-primary" />
-              <MetricPill icon={Flame}       label="Calories"     value={metrics.calories}    unit="kcal"   active={!!metrics.calories}    color="text-amber-500" />
+              <MetricPill icon={Heart} label="Heart Rate" value={metrics.heartRate} unit="bpm" active={!!metrics.heartRate} color="text-red-500" />
+              <MetricPill icon={Droplets} label="SpO2" value={metrics.spo2} unit="%" active={!!metrics.spo2} color="text-blue-500" />
+              <MetricPill icon={Brain} label="HRV" value={metrics.hrv} unit="ms" active={!!metrics.hrv} color="text-purple-500" />
+              <MetricPill icon={Activity} label="Stress" value={metrics.fatigue} unit="/100" active={!!metrics.fatigue} color="text-orange-500" />
+              <MetricPill icon={Zap} label="Steps" value={metrics.steps?.toLocaleString()} unit="steps" active={!!metrics.steps} color="text-health-primary" />
+              <MetricPill icon={Flame} label="Calories" value={metrics.calories} unit="kcal" active={!!metrics.calories} color="text-amber-500" />
               {metrics.temperature && (
-                <MetricPill icon={Thermometer} label="Temp"       value={metrics.temperature} unit="°C"    active={!!metrics.temperature} color="text-cyan-500" />
+                <MetricPill icon={Thermometer} label="Temp" value={metrics.temperature} unit="°C" active={!!metrics.temperature} color="text-cyan-500" />
               )}
             </div>
 
@@ -465,9 +463,9 @@ export default function BleConnect() {
             <h4 className="text-[10px] font-black uppercase tracking-widest text-health-muted">How it works</h4>
             {[
               ["1", "Bluetooth", "Tap Connect → select your QRing from the browser popup"],
-              ["2", "Measure",   "Ring measures HR, SpO2, HRV, Stress for 60 seconds"],
-              ["3", "Export",    "Tap Export → data uploads to HexaGene Cloud instantly"],
-              ["4", "Analyze",   "Dashboard auto-fills → Run AI analysis → see results"],
+              ["2", "Measure", "Ring measures HR, SpO2, HRV, Stress for 60 seconds"],
+              ["3", "Export", "Tap Export → data uploads to HexaGene Cloud instantly"],
+              ["4", "Analyze", "Dashboard auto-fills → Run AI analysis → see results"],
             ].map(([n, title, desc]) => (
               <div key={n} className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-health-primary text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">

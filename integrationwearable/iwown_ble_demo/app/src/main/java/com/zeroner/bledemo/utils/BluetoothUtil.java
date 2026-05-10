@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.text.TextUtils;
 
 import com.zeroner.bledemo.BleApplication;
+import com.zeroner.bledemo.ble.BLEManager;
 import com.zeroner.blemidautumn.bean.WristBand;
 import com.zeroner.blemidautumn.bluetooth.SuperBleSDK;
 import com.zeroner.blemidautumn.bluetooth.cmdimpl.ProtoBufSendBluetoothCmdImpl;
@@ -72,7 +73,7 @@ public class BluetoothUtil {
      * @return false or true
      */
     public static boolean isConnected() {
-        return isIBleNotNull() &&  SuperBleSDK.createInstance(context).isConnected();
+        return (isIBleNotNull() && SuperBleSDK.createInstance(context).isConnected()) || BLEManager.getInstance().isConnected();
     }
 
 
@@ -125,7 +126,9 @@ public class BluetoothUtil {
      * @param wristBand
      */
     public static void connect(WristBand wristBand){
-        if( isIBleNotNull()){
+        if (wristBand.getName() != null && (wristBand.getName().contains("QRing") || wristBand.getName().contains("X6") || wristBand.getName().contains("Hexa"))) {
+            BLEManager.getInstance().connect(wristBand.getAddress());
+        } else if( isIBleNotNull()){
             setNeedReconnect(true);
             SuperBleSDK.createInstance(context).setWristBand(wristBand);
             SuperBleSDK.createInstance(context).connect();
@@ -207,6 +210,13 @@ public class BluetoothUtil {
     public static void stopScan() {
         if (isIBleNotNull()) {
             SuperBleSDK.createInstance(context).stopScan();
+        }
+    }
+
+    public static void disconnect() {
+        BLEManager.getInstance().disconnect();
+        if (isIBleNotNull()) {
+            SuperBleSDK.createInstance(context).disconnect(PrefUtil.getString(context,BaseActionUtils.ACTION_DEVICE_ADDRESS),true);
         }
     }
 

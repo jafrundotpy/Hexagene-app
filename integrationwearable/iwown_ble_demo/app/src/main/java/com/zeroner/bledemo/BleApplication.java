@@ -57,6 +57,7 @@ public class BleApplication extends LitePalApplication{
         LitePal.initialize(this);
         Stetho.initializeWithDefaults(this);
         SuperBleSDK.getInstance().init(this);
+        com.zeroner.bledemo.ble.BLEManager.getInstance().init(this);
         Intent bindIntent = new Intent(this, BleService.class);
         stopService(bindIntent);
         bindService(bindIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
