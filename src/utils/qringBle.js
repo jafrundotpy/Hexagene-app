@@ -63,7 +63,14 @@ export class QRingBLE {
 
     this.device = await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
-      optionalServices: [shortServiceId, SERVICE_UUID],
+      optionalServices: [
+        shortServiceId, 
+        SERVICE_UUID,
+        '00001530-0000-1000-8000-00805f9b34fb',
+        '0000fe59-0000-1000-8000-00805f9b34fb',
+        '0000ffe0-0000-1000-8000-00805f9b34fb',
+        '0000fee7-0000-1000-8000-00805f9b34fb'
+      ],
     });
 
     this.device.addEventListener('gattserverdisconnected', () => {
@@ -80,14 +87,22 @@ export class QRingBLE {
     } catch (e) {
       console.warn("Primary service UUID 0xFFF0 not found, scanning all services...");
       const services = await this.server.getPrimaryServices();
+      const possibleChars = [
+        TX_UUID, 
+        '8082caa8-41a6-4021-91c6-56f9b954cc34',
+        '0000fff6-0000-1000-8000-00805f9b34fb'
+      ];
+      
       for (const s of services) {
-        try {
-          // Check if this service contains the TX characteristic (0xFFF6)
-          await s.getCharacteristic(TX_UUID);
-          this.service = s;
-          console.log("Found compatible QRing service:", s.uuid);
-          break;
-        } catch (err) { continue; }
+        for (const charUuid of possibleChars) {
+          try {
+            await s.getCharacteristic(charUuid);
+            this.service = s;
+            console.log("Found compatible QRing service via characteristic:", s.uuid, "at char:", charUuid);
+            break;
+          } catch (err) { continue; }
+        }
+        if (this.service) break;
       }
     }
 
@@ -95,8 +110,20 @@ export class QRingBLE {
       throw new Error("No compatible QRing service found. Please ensure you are connecting to an X6 Smart Ring.");
     }
 
-    this.txChar = await this.service.getCharacteristic(TX_UUID);
-    this.rxChar = await this.service.getCharacteristic(RX_UUID);
+    // Flexible characteristic assignment
+    const txUuids = [TX_UUID, '8082caa8-41a6-4021-91c6-56f9b954cc34', '0000fff6-0000-1000-8000-00805f9b34fb'];
+    const rxUuids = [RX_UUID, '724249f0-5ec3-4b5f-8804-42345af08651', '0000fff7-0000-1000-8000-00805f9b34fb'];
+
+    for (const uuid of txUuids) {
+      try { this.txChar = await this.service.getCharacteristic(uuid); break; } catch(e) {}
+    }
+    for (const uuid of rxUuids) {
+      try { this.rxChar = await this.service.getCharacteristic(uuid); break; } catch(e) {}
+    }
+
+    if (!this.txChar || !this.rxChar) {
+      throw new Error("Found service but failed to find data channels (TX/RX).");
+    }
 
     this.rxChar.addEventListener('characteristicvaluechanged', (e) => {
       this._onRx(new Uint8Array(e.target.value.buffer));
