@@ -57,8 +57,8 @@ export class X3BleEngine {
     try {
       this.logStatus("Requesting QRing/X3 device...");
       this.device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [0xFFF0] }],
-        optionalServices: [SERVICE_UUID]
+        acceptAllDevices: true,
+        optionalServices: [0xFFF0, SERVICE_UUID]
       });
 
       this.device.addEventListener('gattserverdisconnected', () => {
