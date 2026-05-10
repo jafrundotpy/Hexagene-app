@@ -70,11 +70,44 @@ export class X3BleEngine {
       this.server = await this.device.gatt.connect();
 
       this.logStatus("Discovering X3 Service...");
-      this.service = await this.server.getPrimaryService(SERVICE_UUID);
+      // Try multiple ways to get the service
+      try {
+        this.service = await this.server.getPrimaryService(0xFFF0);
+      } catch (e) {
+        try {
+          this.service = await this.server.getPrimaryService(SERVICE_UUID);
+        } catch (e2) {
+          this.logStatus("Direct service lookup failed, scanning all services...");
+          const services = await this.server.getPrimaryServices();
+          this.logStatus(`Found ${services.length} total services.`);
+          
+          for (const s of services) {
+            this.logStatus(`Checking service: ${s.uuid}`);
+            // Check for fff0 in any form
+            if (s.uuid.includes('fff0')) {
+              this.service = s;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!this.service) {
+        throw new Error(`No Services matching UUID ${SERVICE_UUID} found in Device.`);
+      }
 
       this.logStatus("Discovering Characteristics...");
-      this.txChar = await this.service.getCharacteristic(TX_UUID);
-      this.rxChar = await this.service.getCharacteristic(RX_UUID);
+      try {
+        this.txChar = await this.service.getCharacteristic(TX_UUID);
+      } catch (e) {
+        this.txChar = await this.service.getCharacteristic(0xFFF6);
+      }
+      
+      try {
+        this.rxChar = await this.service.getCharacteristic(RX_UUID);
+      } catch (e) {
+        this.rxChar = await this.service.getCharacteristic(0xFFF7);
+      }
 
       this.logStatus("Subscribing to RX Notifications...");
       this.rxChar.addEventListener('characteristicvaluechanged', (event) => {
