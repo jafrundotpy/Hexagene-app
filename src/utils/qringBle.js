@@ -54,7 +54,7 @@ export class X3BleEngine {
       this.logStatus("Requesting X3 device (Accept All)...");
       this.device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: [SERVICE_UUID]
+        optionalServices: [0xFFF0, SERVICE_UUID]
       });
 
       this.device.addEventListener('gattserverdisconnected', () => {
@@ -71,25 +71,33 @@ export class X3BleEngine {
 
       this.logStatus("Discovering X3 Service (Full UUID)...");
       
-      // 3. Fallback service discovery
-      try {
-        this.service = await this.server.getPrimaryService(SERVICE_UUID);
-      } catch (e) {
-        this.logStatus(`Primary lookup failed: ${e.message}. Scanning all services...`);
-        const services = await this.server.getPrimaryServices();
-        
-        for (const s of services) {
-          this.logStatus(`Discovered Service: ${s.uuid}`);
-          if (s.uuid === SERVICE_UUID || s.uuid.includes('fff0')) {
-            this.service = s;
-            this.logStatus(`Found Matching Service: ${s.uuid}`);
-            break;
-          }
+      this.logStatus("Discovering X3 Service (Aggressive Scan)...");
+      
+      let services = [];
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          services = await this.server.getPrimaryServices();
+          if (services.length > 0) break;
+          this.logStatus(`Attempt ${attempt}: No services found yet. Retrying in 1s...`);
+        } catch (e) {
+          this.logStatus(`Attempt ${attempt} failed: ${e.message}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      this.logStatus(`Found ${services.length} services after discovery.`);
+      
+      for (const s of services) {
+        this.logStatus(`Checking Service: ${s.uuid}`);
+        // Match either full UUID or short UUID 0xFFF0
+        if (s.uuid === SERVICE_UUID || s.uuid.includes('fff0')) {
+          this.service = s;
+          break;
         }
       }
 
       if (!this.service) {
-        throw new Error("No compatible X3 services found in device.");
+        throw new Error("No compatible X3 services found. Please ensure the ring is not paired with another app.");
       }
 
       this.logStatus("Discovering Characteristics...");
