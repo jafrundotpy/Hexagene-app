@@ -1,23 +1,16 @@
 /**
  * HexaGene Official Wearable BLE Engine (X3 Protocol)
  * 
- * Protocol Specification:
- * - 16-byte command packets
- * - CRC-8 checksum: sum of first 15 bytes & 0xFF
- * - Service: 0xFFF0
- * - TX: 0xFFF6 (Write)
- * - RX: 0xFFF7 (Notify)
+ * UUIDs (FULL FORMAT):
+ * SERVICE_UUID: 0000fff0-0000-1000-8000-00805f9b34fb
+ * TX_UUID:      0000fff6-0000-1000-8000-00805f9b34fb
+ * RX_UUID:      0000fff7-0000-1000-8000-00805f9b34fb
  */
 
 const SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb';
 const TX_UUID      = '0000fff6-0000-1000-8000-00805f9b34fb';
 const RX_UUID      = '0000fff7-0000-1000-8000-00805f9b34fb';
 
-/**
- * Calculate X3 CRC-8 Checksum
- * @param {Uint8Array} pkt 16-byte packet
- * @returns {number} 8-bit checksum
- */
 export function calculateCRC(pkt) {
   let sum = 0;
   for (let i = 0; i < 15; i++) {
@@ -26,9 +19,6 @@ export function calculateCRC(pkt) {
   return sum & 0xFF;
 }
 
-/**
- * Build a standard 16-byte X3 command packet
- */
 export function buildPacket(command, payload = []) {
   const pkt = new Uint8Array(16);
   pkt[0] = command;
@@ -47,66 +37,71 @@ export class X3BleEngine {
     this.txChar = null;
     this.rxChar = null;
     
-    this.onData = null;       // (parsedData) -> void
-    this.onRawHex = null;     // (hexString) -> void
-    this.onStatus = null;     // (statusString) -> void
-    this.onConnection = null; // (connected, name) -> void
+    this.onData = null;
+    this.onRawHex = null;
+    this.onStatus = null;
+    this.onConnection = null;
   }
 
   async connect() {
+    // 5. Reconnect-safe logic: disconnect previous GATT before reconnect attempt
+    if (this.device && this.device.gatt.connected) {
+      this.logStatus("Disconnecting previous session...");
+      await this.device.gatt.disconnect();
+    }
+
     try {
-      this.logStatus("Requesting QRing/X3 device...");
+      this.logStatus("Requesting X3 device (Accept All)...");
       this.device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: [0xFFF0, SERVICE_UUID]
+        optionalServices: [SERVICE_UUID]
       });
 
       this.device.addEventListener('gattserverdisconnected', () => {
-        this.logStatus("Disconnected");
+        this.logStatus("GATT Disconnected");
         if (this.onConnection) this.onConnection(false, null);
       });
 
-      this.logStatus("Connecting to GATT Server...");
+      this.logStatus(`Connecting to ${this.device.name}...`);
       this.server = await this.device.gatt.connect();
 
-      this.logStatus("Discovering X3 Service...");
-      // Try multiple ways to get the service
+      // 4. 2-second delay after GATT connection before service discovery
+      this.logStatus("GATT Connected. Waiting 2s for saturation...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      this.logStatus("Discovering X3 Service (Full UUID)...");
+      
+      // 3. Fallback service discovery
       try {
-        this.service = await this.server.getPrimaryService(0xFFF0);
+        this.service = await this.server.getPrimaryService(SERVICE_UUID);
       } catch (e) {
-        try {
-          this.service = await this.server.getPrimaryService(SERVICE_UUID);
-        } catch (e2) {
-          this.logStatus("Direct service lookup failed, scanning all services...");
-          const services = await this.server.getPrimaryServices();
-          this.logStatus(`Found ${services.length} total services.`);
-          
-          for (const s of services) {
-            this.logStatus(`Checking service: ${s.uuid}`);
-            // Check for fff0 in any form
-            if (s.uuid.includes('fff0')) {
-              this.service = s;
-              break;
-            }
+        this.logStatus(`Primary lookup failed: ${e.message}. Scanning all services...`);
+        const services = await this.server.getPrimaryServices();
+        
+        for (const s of services) {
+          this.logStatus(`Discovered Service: ${s.uuid}`);
+          if (s.uuid === SERVICE_UUID || s.uuid.includes('fff0')) {
+            this.service = s;
+            this.logStatus(`Found Matching Service: ${s.uuid}`);
+            break;
           }
         }
       }
 
       if (!this.service) {
-        throw new Error(`No Services matching UUID ${SERVICE_UUID} found in Device.`);
+        throw new Error("No compatible X3 services found in device.");
       }
 
       this.logStatus("Discovering Characteristics...");
-      try {
-        this.txChar = await this.service.getCharacteristic(TX_UUID);
-      } catch (e) {
-        this.txChar = await this.service.getCharacteristic(0xFFF6);
+      const chars = await this.service.getCharacteristics();
+      for (const c of chars) {
+        this.logStatus(`Discovered Char: ${c.uuid}`);
+        if (c.uuid === TX_UUID) this.txChar = c;
+        if (c.uuid === RX_UUID) this.rxChar = c;
       }
-      
-      try {
-        this.rxChar = await this.service.getCharacteristic(RX_UUID);
-      } catch (e) {
-        this.rxChar = await this.service.getCharacteristic(0xFFF7);
+
+      if (!this.txChar || !this.rxChar) {
+        throw new Error("Missing TX or RX characteristics.");
       }
 
       this.logStatus("Subscribing to RX Notifications...");
@@ -115,15 +110,13 @@ export class X3BleEngine {
       });
       await this.rxChar.startNotifications();
 
-      this.logStatus("Connection established");
+      this.logStatus("X3 Engine Ready");
       if (this.onConnection) this.onConnection(true, this.device.name);
 
-      // Phase 4: Automatically send realtime streaming command (0x09)
       await this.enableRealtimeStreaming();
-
       return true;
     } catch (err) {
-      this.logStatus(`Connection failed: ${err.message}`);
+      this.logStatus(`Engine Error: ${err.message}`);
       throw err;
     }
   }
@@ -135,22 +128,15 @@ export class X3BleEngine {
   }
 
   async enableRealtimeStreaming() {
-    this.logStatus("Activating Realtime Stream (0x09)...");
-    // 0x09 01 01 ... CRC
-    // 01 01 enables steps and temperature
     const pkt = buildPacket(0x09, [0x01, 0x01]);
     await this.txChar.writeValueWithResponse(pkt);
   }
 
   _handleRx(data) {
-    // Phase 6: Raw HEX Packet Debug
     const hex = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
     if (this.onRawHex) this.onRawHex(hex);
 
     const cmd = data[0];
-    
-    // Phase 3 & 4: Parse Realtime Packet (0x09 is usually 31 bytes or 16 depending on firmware)
-    // Most X3 rings use 31-byte response for 0x09, but the 16-byte format is also common for status.
     if (cmd === 0x09) {
       this._parseRealtime(data);
     } else if (cmd === 0x13) {
@@ -160,36 +146,21 @@ export class X3BleEngine {
 
   _parseRealtime(data) {
     if (data.length < 16) return;
-
     const metrics = {
       timestamp: Date.now(),
-      steps: 0,
-      heartRate: null,
-      spo2: null,
-      temperature: null,
+      steps: (data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24)) >>> 0,
+      heartRate: data.length >= 26 ? (data[22] > 0 ? data[22] : null) : null,
+      spo2: data.length >= 26 ? (data[25] > 0 ? data[25] : null) : null,
     };
-
     if (data.length >= 26) {
-      // 31-byte variant
-      metrics.steps = (data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24)) >>> 0;
-      metrics.heartRate = data[22] > 0 ? data[22] : null;
       const tempRaw = data[23] | (data[24] << 8);
       metrics.temperature = tempRaw > 0 ? (tempRaw / 10).toFixed(1) : null;
-      metrics.spo2 = data[25] > 0 ? data[25] : null;
-    } else {
-      // 16-byte variant (fallback)
-      metrics.steps = (data[1] | (data[2] << 8) | (data[3] << 16) | (data[4] << 24)) >>> 0;
     }
-
     if (this.onData) this.onData(metrics);
   }
 
   _parseBattery(data) {
-    const battery = {
-      level: data[1],
-      charging: data[2] === 1
-    };
-    if (this.onData) this.onData({ battery });
+    if (this.onData) this.onData({ battery: { level: data[1], charging: data[2] === 1 } });
   }
 
   logStatus(msg) {

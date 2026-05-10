@@ -183,7 +183,15 @@ export default function BleConnect() {
           </p>
         </div>
 
-        {/* Phase 2: Action Center */}
+        {/* User Warning (Requirement #6) */}
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3 items-start">
+          <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={18} />
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <span className="font-black uppercase tracking-wider">Critical:</span> If the official QRing app is already connected, you MUST close it or turn off your other phone's Bluetooth before using HexaGene.
+          </p>
+        </div>
+
+        {/* Action Center */}
         <div className="health-card p-8 space-y-6">
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
@@ -200,7 +208,7 @@ export default function BleConnect() {
             ) : null}
           </div>
 
-          {/* Phase 5: Live Metrics Grid */}
+          {/* Live Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
             <LiveMetricCard icon={Heart} label="Heart Rate" value={metrics.heartRate} unit="bpm" color="text-red-500" />
             <LiveMetricCard icon={Droplets} label="Oxygen" value={metrics.spo2} unit="%" color="text-blue-500" />
