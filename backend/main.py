@@ -303,6 +303,7 @@ class WearableScoreRequest(BaseModel):
     spo2: Optional[float] = None
     calories_burned: Optional[float] = None
     active_minutes: Optional[float] = None
+    temperature: Optional[float] = None
 
 class WearableIngestRequest(BaseModel):
     user_id: Optional[str] = None
@@ -316,6 +317,7 @@ class WearableIngestRequest(BaseModel):
     stress_score: Optional[float] = None
     spo2: Optional[float] = None
     calories_burned: Optional[float] = None
+    temperature: Optional[float] = None
     battery: Optional[int] = None
     device_id: Optional[str] = None
     age: Optional[int] = None
@@ -656,6 +658,7 @@ async def score_from_wearable(request: WearableScoreRequest, key_data=Depends(ve
     if request.spo2 is not None: row["spo2"] = request.spo2
     if request.calories_burned is not None: row["calories_burned"] = request.calories_burned
     if request.active_minutes is not None: row["active_minutes"] = request.active_minutes
+    if request.temperature is not None: row["temperature"] = request.temperature
 
     patient_data = wearable_to_patient_input(row)
     logger.info(f"Engine Input (patient_data): {patient_data}")
@@ -696,7 +699,8 @@ async def live_sync(request: WearableScoreRequest, key_data=Depends(verify_api_k
         "stress_score": request.stress_score,
         "spo2": request.spo2,
         "calories_burned": request.calories_burned,
-        "active_minutes": request.active_minutes
+        "active_minutes": request.active_minutes,
+        "temperature": request.temperature
     }
     
     # Use isolated mapping logic
@@ -875,7 +879,7 @@ async def ingest_wearable(payload: WearableIngestRequest):
     row = {"user_id": target_user_id, "source": payload.source or "apple_health"}
     for field in ["daily_steps", "resting_heart_rate", "avg_sleep_hours",
                   "hrv", "active_minutes", "stress_score", "spo2",
-                  "calories_burned", "battery", "device_id", "age", "sex"]:
+                  "calories_burned", "battery", "device_id", "age", "sex", "temperature"]:
         val = getattr(payload, field, None)
         if val is not None:
             row[field] = val
