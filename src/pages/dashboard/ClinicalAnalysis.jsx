@@ -23,6 +23,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import API_URL from "../../api/config";
 import MetricCard from "../../components/dashboard/MetricCard";
+import DebugPanel from "../../components/dashboard/DebugPanel";
 
 const DRUG_LIST = [
   "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
@@ -64,6 +65,13 @@ const ClinicalAnalysis = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [results, setResults] = useState(null);
+  const [debugData, setDebugData] = useState({
+    request: null,
+    response: null,
+    endpoint: null,
+    latency: null,
+    error: null
+  });
 
   const [form, setForm] = useState({
     age: "45",
@@ -151,6 +159,9 @@ const ClinicalAnalysis = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    const t0 = performance.now();
+    let currentStep = "Intake";
+    
     try {
       const apiKey = "merlin123merlin123";
       const headers = {
@@ -170,6 +181,15 @@ const ClinicalAnalysis = () => {
         raw_23andme: form.raw_23andme
       };
 
+      setDebugData({
+        request: intakePayload,
+        endpoint: `${API_URL}/v2/intake`,
+        response: null,
+        latency: null,
+        error: null
+      });
+
+      // 1. Intake
       const intakeRes = await fetch(`${API_URL}/v2/intake`, {
         method: "POST",
         headers,
@@ -178,6 +198,8 @@ const ClinicalAnalysis = () => {
       if (!intakeRes.ok) throw new Error("Intake failed");
       const intakeData = await intakeRes.json();
 
+      // 2. Score
+      currentStep = "Scoring";
       const scoreRes = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
         headers,
@@ -186,6 +208,8 @@ const ClinicalAnalysis = () => {
       if (!scoreRes.ok) throw new Error("Scoring failed");
       const scoreData = await scoreRes.json();
 
+      // 3. Report
+      currentStep = "Reporting";
       const reportRes = await fetch(`${API_URL}/v2/report`, {
         method: "POST",
         headers,
@@ -194,9 +218,17 @@ const ClinicalAnalysis = () => {
       if (!reportRes.ok) throw new Error("Report generation failed");
       const finalReport = await reportRes.json();
 
+      const t1 = performance.now();
       setResults(finalReport);
+      setDebugData(prev => ({
+        ...prev,
+        response: finalReport,
+        endpoint: `${API_URL}/v2/report (Multi-step flow)`,
+        latency: Math.round(t1 - t0)
+      }));
     } catch (err) {
-      setError(err.message);
+      setError(`${currentStep} Error: ${err.message}`);
+      setDebugData(prev => ({ ...prev, error: `${currentStep}: ${err.message}` }));
     } finally {
       setLoading(false);
     }
@@ -640,6 +672,15 @@ const ClinicalAnalysis = () => {
           )}
         </div>
       </div>
+
+      {/* DEBUG PANEL */}
+      <DebugPanel 
+        request={debugData.request}
+        response={debugData.response}
+        endpoint={debugData.endpoint}
+        latency={debugData.latency}
+        error={debugData.error}
+      />
     </div>
   );
 };

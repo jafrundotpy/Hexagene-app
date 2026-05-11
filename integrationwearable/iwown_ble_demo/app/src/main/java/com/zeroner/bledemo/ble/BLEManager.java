@@ -176,7 +176,6 @@ public class BLEManager {
                     Log.i(TAG, "BLE_SERVICE_FALLBACK: Found notify char: " + c.getUuid());
                     setupNotification(gatt, c);
                     notifyChars.add(c);
-                    // Also try to find a write char in same service
                     if (writeChar == null && (props & BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
                         writeChar = c;
                     }
@@ -187,11 +186,17 @@ public class BLEManager {
 
     private void startInitializationSequence() {
         mainHandler.postDelayed(() -> {
-            // Trigger Battery Read
+            // Read Battery
             writeCommand(new byte[]{0x13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x13});
-            // Trigger Realtime Mode
+            
+            // Subscribe to ALL requested characteristics if they were found
+            for (BluetoothGattCharacteristic c : notifyChars) {
+                Log.i(TAG, "BLE_NOTIFY: Verifying subscription for " + c.getUuid());
+            }
+
+            // Trigger Realtime Mode (0x09)
             writeCommand(new byte[]{0x09, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0B});
-        }, 1000);
+        }, 1500);
     }
 
     public void writeCommand(byte[] data) {
@@ -199,6 +204,22 @@ public class BLEManager {
             writeChar.setValue(data);
             boolean success = gatt.writeCharacteristic(writeChar);
             Log.d(TAG, "BLE_WRITE: Status=" + success + " CMD=" + String.format("%02X", data[0]));
+        }
+    }
+
+    // Auto-Reconnect Logic
+    private int reconnectAttempts = 0;
+    private final Runnable reconnectRunnable = () -> {
+        if (!isConnected && lastDeviceAddress != null) {
+            Log.i(TAG, "BLE_CONNECT: Attempting auto-reconnect (" + reconnectAttempts + ")");
+            connect(lastDeviceAddress);
+        }
+    };
+
+    private void triggerReconnect() {
+        if (reconnectAttempts < 5) {
+            reconnectAttempts++;
+            mainHandler.postDelayed(reconnectRunnable, 5000 * reconnectAttempts);
         }
     }
 }

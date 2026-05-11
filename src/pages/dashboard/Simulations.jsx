@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import MetricCard from "../../components/dashboard/MetricCard";
 import API_URL from "../../api/config";
+import DebugPanel from "../../components/dashboard/DebugPanel";
 
 const Simulations = () => {
   const [loading, setLoading] = useState(false);
@@ -28,6 +29,13 @@ const Simulations = () => {
   const [results, setResults] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [debugData, setDebugData] = useState({
+    request: null,
+    response: null,
+    endpoint: null,
+    latency: null,
+    error: null
+  });
   const fileRef = useRef();
 
   const [wearableData, setWearableData] = useState(null);
@@ -45,44 +53,45 @@ const Simulations = () => {
   const handleSyncWearable = async () => {
     try {
       const token = localStorage.getItem("token");
-      let email = "";
+      let userId = "";
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]));
-          email = payload.email || payload.sub; // Fallback to sub if email not explicit
+          userId = payload.id || payload.sub;
         } catch (e) {}
       }
 
-      if (!email) {
-        console.warn("No user email found for sync");
+      if (!userId) {
+        console.warn("No user ID found for sync");
         return;
       }
 
-      const response = await fetch(`${API_URL}/v2/wearable-data/${email}`, {
-        method: "GET",
+      const response = await fetch(`${API_URL}/v2/wearable-data`, {
+        method: "POST",
         headers: {
+          "Content-Type": "application/json",
           "x-api-key": "merlin123merlin123" 
-        }
+        },
+        body: JSON.stringify({ user_id: userId })
       });
 
       if (!response.ok) throw new Error("Failed to fetch wearable data");
       const result = await response.json();
 
-      if (result.success && result.data) {
-        const data = result.data;
-        setWearableData(data);
+      if (result && Object.keys(result).length > 0) {
+        setWearableData(result);
         setForm(prev => ({
           ...prev,
-          dailySteps: data.daily_steps || prev.dailySteps,
-          restingHR: data.resting_heart_rate || prev.restingHR,
-          sleepDuration: data.avg_sleep_hours || prev.sleepDuration,
-          hrv: data.hrv || prev.hrv,
-          activeMinutes: data.active_minutes || prev.activeMinutes,
-          stress: data.stress_score || prev.stress,
-          oxygen: data.spo2 || prev.oxygen,
-          calories: data.calories_burned || prev.calories,
-          age: data.age || prev.age,
-          sex: data.sex || prev.sex,
+          dailySteps: result.daily_steps || prev.dailySteps,
+          restingHR: result.resting_heart_rate || prev.restingHR,
+          sleepDuration: result.avg_sleep_hours || prev.sleepDuration,
+          hrv: result.hrv || prev.hrv,
+          activeMinutes: result.active_minutes || prev.activeMinutes,
+          stress: result.stress_score || prev.stress,
+          oxygen: result.spo2 || prev.oxygen,
+          calories: result.calories_burned || prev.calories,
+          age: result.age || prev.age,
+          sex: result.sex !== undefined ? String(result.sex) : prev.sex,
         }));
         setLastSyncTime(new Date().toLocaleTimeString());
       }
@@ -164,25 +173,40 @@ const Simulations = () => {
       return;
     }
 
+    const t0 = performance.now();
+    let userId = "demo-user";
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userId = payload.id || payload.sub;
+      } catch (e) {
+        console.error("Token parse error", e);
+      }
+    }
+
+    const endpoint = `${API_URL}/v2/score-from-wearable`;
+    const payload = {
+      user_id: userId,
+      age: parseInt(form.age),
+      sex: parseInt(form.sex) === 0 ? "M" : "F", // Align with backend sex mapping if needed, but backend expects str in model
+      daily_steps: parseFloat(form.dailySteps) || 0,
+      resting_heart_rate: parseFloat(form.restingHR) || 0,
+      avg_sleep_hours: parseFloat(form.sleepDuration) || 0,
+      hrv: parseFloat(form.hrv) || 0,
+      stress_score: parseFloat(form.stress) || 0,
+      spo2: parseFloat(form.oxygen) || 0,
+      calories_burned: parseFloat(form.calories) || 0,
+      active_minutes: parseFloat(form.activeMinutes) || 0
+    };
+
+    setDebugData(prev => ({ ...prev, request: payload, endpoint, error: null }));
+
     try {
       setLoading(true);
       setStatusMsg("Connecting to clinical analysis engine...");
       
-      // Format input for live-sync endpoint
-      const payload = {
-        age: parseInt(form.age),
-        sex: parseInt(form.sex),
-        daily_steps: parseFloat(form.dailySteps) || 0,
-        resting_heart_rate: parseFloat(form.restingHR) || 0,
-        avg_sleep_hours: parseFloat(form.sleepDuration) || 0,
-        hrv: parseFloat(form.hrv) || 0,
-        stress_score: parseFloat(form.stress) || 0,
-        spo2: parseFloat(form.oxygen) || 0,
-        calories_burned: parseFloat(form.calories) || 0,
-        active_minutes: parseFloat(form.activeMinutes) || 0
-      };
-
-      const response = await fetch(`${API_URL}/api/wearable/live-sync`, {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -191,12 +215,21 @@ const Simulations = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error("Hexa engine error");
+      const t1 = performance.now();
+      const latency = Math.round(t1 - t0);
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.detail || "Hexa engine error");
+      }
+
       const data = await response.json();
       setResults(data);
+      setDebugData(prev => ({ ...prev, response: data, latency }));
       setStatusMsg(null);
     } catch (err) {
       setStatusMsg("❌ Analysis failed: " + err.message);
+      setDebugData(prev => ({ ...prev, error: err.message }));
     } finally {
       setLoading(false);
     }
@@ -512,6 +545,15 @@ const Simulations = () => {
           </div>
         </div>
       </div>
+
+      {/* DEBUG PANEL */}
+      <DebugPanel 
+        request={debugData.request}
+        response={debugData.response}
+        endpoint={debugData.endpoint}
+        latency={debugData.latency}
+        error={debugData.error}
+      />
     </div>
   );
 };
