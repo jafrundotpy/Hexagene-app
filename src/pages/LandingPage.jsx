@@ -45,9 +45,10 @@ const LandingPage = () => {
           <Logo size={32} />
           
           <div className="hidden md:flex items-center gap-8">
-            <a href="#validation" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Validation</a>
             <a href="#features" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Features</a>
-            <a href="#deployment" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Commercial</a>
+            <a href="#platform" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Platform</a>
+            <a href="#faq" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Technical FAQ</a>
+            <button onClick={() => navigate('/about')} className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">About Merlin</button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -393,9 +394,10 @@ const LandingPage = () => {
             © 2026 HexaGene Systems. All rights reserved.
           </div>
           <div className="flex gap-6">
+            <button onClick={() => navigate('/about')} className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">About Merlin</button>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Privacy</a>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Terms</a>
-            <a href="#deployment" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Contact</a>
+            <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Contact</a>
           </div>
         </div>
       </footer>

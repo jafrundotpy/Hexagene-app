@@ -14,6 +14,7 @@ import IntegrationDocs from './pages/dashboard/IntegrationDocs';
 import Usage from './pages/dashboard/Usage';
 import Settings from './pages/dashboard/Settings';
 import BleConnect from './pages/connect/BleConnect';
+import AboutMerlin from './pages/AboutMerlin';
 
 // 🔐 PROTECTED ROUTE (TOKEN BASED)
 const ProtectedRoute = ({ children }) => {
@@ -47,6 +48,7 @@ function App() {
 
         {/* 🌐 PUBLIC ROUTES */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<AboutMerlin />} />
 
         <Route 
           path="/login" 
