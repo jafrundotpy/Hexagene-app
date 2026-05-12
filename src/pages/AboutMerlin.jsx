@@ -94,14 +94,89 @@ const AboutMerlin = () => {
       animate="animate"
       className="min-h-screen bg-[#05070a] text-white selection:bg-health-primary/30 overflow-hidden relative font-body"
     >
-      {/* BACKGROUND ELEMENTS */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-health-primary/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+      {/* CINEMATIC BACKGROUND SYSTEM */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         
-        {/* Subtle Grid */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-50 mix-blend-overlay" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+        {/* Layer 1: Deep Base & Vignette */}
+        <div className="absolute inset-0 bg-[#05070a]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60 z-10" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(5,7,10,0.8)_100%)] z-10" />
+
+        {/* Layer 2: Moving Atmospheric Glows */}
+        <motion.div 
+          animate={{ 
+            x: [0, 50, -50, 0],
+            y: [0, -30, 30, 0],
+            scale: [1, 1.1, 0.9, 1]
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-health-primary/10 blur-[150px] rounded-full opacity-40" 
+        />
+        <motion.div 
+          animate={{ 
+            x: [0, -40, 40, 0],
+            y: [0, 50, -50, 0],
+            scale: [1, 1.2, 0.8, 1]
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-blue-500/10 blur-[130px] rounded-full opacity-30" 
+        />
+        <motion.div 
+          animate={{ 
+            opacity: [0.1, 0.2, 0.1]
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05)_0%,transparent_70%)]" 
+        />
+
+        {/* Layer 3: Futuristic Ecosystem Grid */}
+        <div className="absolute inset-0 opacity-[0.03] z-10">
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+                <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
+        </div>
+        
+        {/* Layer 4: Floating Particles */}
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ 
+              x: Math.random() * 100 + "%", 
+              y: Math.random() * 100 + "%",
+              opacity: Math.random() * 0.3
+            }}
+            animate={{ 
+              y: [null, "-=100px"],
+              opacity: [0, 0.3, 0]
+            }}
+            transition={{ 
+              duration: 5 + Math.random() * 10, 
+              repeat: Infinity, 
+              ease: "linear" 
+            }}
+            className="absolute w-1 h-1 bg-white rounded-full z-10"
+          />
+        ))}
+
+        {/* Layer 5: Ambient Energy Waves */}
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] border border-white/[0.02] rounded-full z-0"
+        />
+        <motion.div 
+          animate={{ rotate: -360 }}
+          transition={{ duration: 90, repeat: Infinity, ease: "linear" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1600px] h-[1600px] border border-white/[0.01] rounded-full z-0"
+        />
+
+        {/* Glassmorphism Grain Overlay */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 brightness-50 mix-blend-overlay z-20 pointer-events-none" />
       </div>
 
       {/* NAVIGATION */}
