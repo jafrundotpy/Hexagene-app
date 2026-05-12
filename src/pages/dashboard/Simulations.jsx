@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import MetricCard from "../../components/dashboard/MetricCard";
 import API_URL from "../../api/config";
-import DebugPanel from "../../components/dashboard/DebugPanel";
 
 const Simulations = () => {
   const [loading, setLoading] = useState(false);
@@ -546,14 +545,6 @@ const Simulations = () => {
         </div>
       </div>
 
-      {/* DEBUG PANEL */}
-      <DebugPanel 
-        request={debugData.request}
-        response={debugData.response}
-        endpoint={debugData.endpoint}
-        latency={debugData.latency}
-        error={debugData.error}
-      />
     </div>
   );
 };

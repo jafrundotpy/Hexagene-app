@@ -23,7 +23,6 @@ import {
 import { useDropzone } from "react-dropzone";
 import API_URL from "../../api/config";
 import MetricCard from "../../components/dashboard/MetricCard";
-import DebugPanel from "../../components/dashboard/DebugPanel";
 
 const DRUG_LIST = [
   "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
@@ -673,14 +672,6 @@ const ClinicalAnalysis = () => {
         </div>
       </div>
 
-      {/* DEBUG PANEL */}
-      <DebugPanel 
-        request={debugData.request}
-        response={debugData.response}
-        endpoint={debugData.endpoint}
-        latency={debugData.latency}
-        error={debugData.error}
-      />
     </div>
   );
 };

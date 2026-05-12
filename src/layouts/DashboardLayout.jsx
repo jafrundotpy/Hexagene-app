@@ -21,10 +21,16 @@ import {
 import ErrorBanner from '../components/UI/ErrorBanner';
 
 const DashboardLayout = () => {
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [globalError, setGlobalError] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const notifications = [
+    { id: 1, text: "Congratulations for registering hexagene welcome to our ecosystem", type: "welcome" },
+    { id: 2, text: "check your hexa score and start your healthy life", type: "action" }
+  ];
 
   const navItems = [
     { name: 'Simulations', path: '/dashboard/simulations', icon: <Activity size={20} /> },
@@ -113,11 +119,33 @@ const DashboardLayout = () => {
             />
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="p-2.5 text-health-muted hover:bg-health-surface rounded-xl transition-all relative">
+          <div className="flex items-center gap-4 relative">
+            <button 
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className="p-2.5 text-health-muted hover:bg-health-surface rounded-xl transition-all relative"
+            >
               <Bell size={20} />
               <span className="absolute top-2 right-2 w-2 h-2 bg-health-secondary rounded-full border-2 border-white" />
             </button>
+
+            {/* NOTIFICATION DROPDOWN */}
+            {isNotificationsOpen && (
+              <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-health-border rounded-2xl shadow-2xl z-50 animate-fade-in overflow-hidden">
+                <div className="p-4 border-b border-health-border bg-health-surface/50">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-health-text">Notifications</h3>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {notifications.map((n) => (
+                    <div key={n.id} className="p-4 border-b border-health-border last:border-0 hover:bg-health-surface transition-colors">
+                      <div className="flex gap-3">
+                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'welcome' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                        <p className="text-xs text-health-text leading-relaxed">{n.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="h-8 w-px bg-health-border mx-2" />
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
