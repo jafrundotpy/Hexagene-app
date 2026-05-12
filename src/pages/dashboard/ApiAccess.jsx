@@ -143,12 +143,14 @@ const ApiAccess = () => {
             <div className="w-full bg-white border border-health-primary/30 p-4 rounded-xl font-mono text-lg font-bold text-health-text break-all shadow-inner">
               {newKey}
             </div>
-            <button 
-              onClick={() => copyToClipboard(newKey, 'new-key')}
-              className="btn-health-primary px-8 py-4 whitespace-nowrap"
-            >
-              {copyStatus === 'new-key' ? "Copied!" : <><Copy size={18} /> Copy Key</>}
-            </button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button 
+                onClick={() => copyToClipboard(newKey, 'new-key')}
+                className="btn-health-primary px-8 py-4 whitespace-nowrap flex-1"
+              >
+                {copyStatus === 'new-key' ? "Copied!" : <><Copy size={18} /> Copy Key</>}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-bold text-orange-600 bg-orange-50 px-4 py-2 rounded-lg inline-flex">
@@ -201,7 +203,9 @@ const ApiAccess = () => {
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
                               <code className="text-xs font-mono font-bold bg-health-surface px-2 py-1 rounded text-health-text">
-                                {showKeyId === (key.id || key.api_key) ? key.api_key : `${key.api_key?.substring(0, 12) || ""}••••••••••••`}
+                                {showKeyId === (key.id || key.api_key) 
+                                  ? key.api_key 
+                                  : `HXG_sk_live_${key.api_key?.substring(12, 16) || "83A2"}••••••${key.api_key?.slice(-4) || "X91F"}`}
                               </code>
                               <button 
                                 onClick={() => toggleKeyVisibility(key.id || key.api_key)}
@@ -211,7 +215,7 @@ const ApiAccess = () => {
                                 {showKeyId === (key.id || key.api_key) ? <EyeOff size={14} /> : <Eye size={14} />}
                               </button>
                             </div>
-                            <p className="text-[10px] text-health-muted font-medium ml-1">SHA-256 Protocol Activated</p>
+                            <p className="text-[10px] text-health-muted font-medium ml-1">Secure Enterprise Access Key</p>
                           </div>
                         </td>
                         <td className="p-4">
@@ -230,10 +234,10 @@ const ApiAccess = () => {
                             {copyStatus === (key.id || key.api_key) ? "Copied" : <><Copy size={12} className="inline mr-1" /> Copy</>}
                           </button>
                           <button 
-                            onClick={() => deleteKey(key.id || key.api_key)}
-                            className="py-2 px-3 text-[10px] uppercase font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            onClick={generateKey}
+                            className="py-2 px-3 text-[10px] uppercase font-black text-health-primary hover:bg-health-primary/5 rounded-xl transition-all"
                           >
-                            Revoke
+                            Regenerate
                           </button>
                         </td>
                       </tr>
@@ -267,7 +271,7 @@ const ApiAccess = () => {
                 </div>
                 <div className="text-white/90 space-y-1">
                   <p><span className="text-health-primary">curl</span> -X POST "https://api.hexagene.com/v2/score" \</p>
-                  <p className="pl-4">-H <span className="text-orange-400">"x-api-key: YOUR_KEY"</span> \</p>
+                  <p className="pl-4">-H <span className="text-orange-400">"x-api-key: HXG_sk_live_••••••••••••"</span> \</p>
                   <p className="pl-4">-H <span className="text-orange-400">"Content-Type: application/json"</span> \</p>
                   <p className="pl-4">-d <span className="text-emerald-400">{`'{ "biomarkers": { "crp": 1.2 } }'`}</span></p>
                 </div>

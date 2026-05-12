@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { 
   Activity, 
   FlaskConical, 
@@ -84,6 +84,14 @@ const ClinicalAnalysis = () => {
     medications: [],
     raw_23andme: ""
   });
+
+  const resultsRef = useRef(null);
+
+  useEffect(() => {
+    if (results && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [results]);
 
   const handleLabChange = (e) => {
     setForm({
@@ -304,8 +312,9 @@ const ClinicalAnalysis = () => {
                 <input 
                   type="number" 
                   value={form.age}
+                  placeholder="45"
                   onChange={(e) => setForm({...form, age: e.target.value})}
-                  className="input-health w-full"
+                  className="input-health w-full opacity-70 focus:opacity-100 transition-opacity"
                 />
               </div>
               <div className="space-y-1.5">
@@ -378,10 +387,18 @@ const ClinicalAnalysis = () => {
                           <input 
                             type="text" 
                             name={field.name}
-                            placeholder="---"
+                            placeholder={
+                              field.name === "hba1c" ? "5.4%" :
+                              field.name === "glucose" ? "90 mg/dL" :
+                              field.name === "hdl" ? "50 mg/dL" :
+                              field.name === "triglycerides" ? "150 mg/dL" :
+                              field.name === "crp" ? "1.2" :
+                              field.name === "hemoglobin" ? "14.5" :
+                              "---"
+                            }
                             value={form.labs[field.name]}
                             onChange={handleLabChange}
-                            className="input-health w-full pl-12"
+                            className="input-health w-full pl-12 opacity-60 focus:opacity-100 transition-opacity"
                           />
                         </div>
                       </div>
@@ -417,9 +434,15 @@ const ClinicalAnalysis = () => {
 
           {/* GENETICS */}
           <div className="health-card p-8 border-t-4 border-t-purple-500">
-            <h3 className="text-lg font-bold text-health-text mb-6 flex items-center gap-3">
-              <Dna className="text-purple-500" size={22} />
-              Genomics (23andMe)
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Dna className="text-purple-500" size={22} />
+                  <span className="font-bold">Genomic Integration & 23andMe Connectivity</span>
+                </div>
+                <div className="px-2 py-0.5 rounded bg-purple-50 border border-purple-100 text-[8px] font-black text-purple-600 uppercase tracking-tighter animate-pulse">
+                  Currently In Development
+                </div>
+              </div>
             </h3>
             <textarea 
               placeholder="Paste raw 23andMe data here..."
@@ -438,7 +461,7 @@ const ClinicalAnalysis = () => {
         </div>
 
         {/* RESULTS PANEL */}
-        <div className="xl:col-span-8">
+        <div ref={resultsRef} className="xl:col-span-8">
           {results ? (
             <div className="space-y-10 animate-fade-in">
               

@@ -99,6 +99,15 @@ const Simulations = () => {
     }
   };
 
+  const resultsRef = useRef(null);
+
+  // Auto-scroll to results
+  React.useEffect(() => {
+    if (results && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [results]);
+
   // Cloud Sync Polling: Automatically fetch latest data every 10 seconds if sync is active
   React.useEffect(() => {
     let interval;
@@ -333,10 +342,16 @@ const Simulations = () => {
                 {isSyncing ? <RefreshCw className="animate-spin" size={24} /> : <Bluetooth size={24} />}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-health-text">QRing Cloud Synchronization</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-health-text">QRing Cloud Synchronization — Updating & Optimization In Progress</h3>
+                  <div className="flex items-center gap-1 bg-health-primary/5 px-2 py-0.5 rounded-full border border-health-primary/10">
+                    <span className="w-1.5 h-1.5 bg-health-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    <span className="text-[8px] font-black text-health-primary uppercase tracking-tighter">Active Engine</span>
+                  </div>
+                </div>
                 <p className="text-xs text-health-muted mt-0.5">
                   {isSyncing 
-                    ? "Live sync active. Wear your QRing and keep the Android app open." 
+                    ? "Live sync active. Updating & optimizing clinical data streams..." 
                     : "Connect your wearable to populate simulation data automatically."}
                 </p>
               </div>
@@ -459,7 +474,7 @@ const Simulations = () => {
         </div>
 
         {/* RIGHT COLUMN: RESULTS */}
-        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-28">
+        <div ref={resultsRef} className="lg:col-span-5 space-y-6 lg:sticky lg:top-28">
           
           <div className="health-card p-8 bg-white overflow-hidden relative border-t-4 border-t-health-primary">
             <div className="flex items-center justify-between mb-8">

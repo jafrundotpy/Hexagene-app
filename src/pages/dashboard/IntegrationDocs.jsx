@@ -154,26 +154,6 @@ export default function IntegrationDocs() {
                   <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-health-muted">Diagnostic Analysis</span>
                 </div>
               </div>
-
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <h4 className="text-sm font-bold text-health-text">Clinical Payload (JSON)</h4>
-                  <CodeBlock 
-                    lang="json"
-                    label="req"
-                    code={requestExample}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-sm font-bold text-health-text">Response Schema</h4>
-                  <CodeBlock 
-                    lang="json"
-                    label="res"
-                    code={responseExample}
-                  />
-                </div>
-              </div>
             </div>
           </section>
 
