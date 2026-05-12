@@ -215,7 +215,7 @@ const ApiAccess = () => {
                                 {showKeyId === (key.id || key.api_key) ? <EyeOff size={14} /> : <Eye size={14} />}
                               </button>
                             </div>
-                            <p className="text-[10px] text-health-muted font-medium ml-1">Secure Enterprise Access Key</p>
+                            <p className="text-[10px] text-health-muted font-medium ml-1">HexaGene Live Access Token</p>
                           </div>
                         </td>
                         <td className="p-4">

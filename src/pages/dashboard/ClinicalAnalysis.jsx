@@ -394,6 +394,18 @@ const ClinicalAnalysis = () => {
                               field.name === "triglycerides" ? "150 mg/dL" :
                               field.name === "crp" ? "1.2" :
                               field.name === "hemoglobin" ? "14.5" :
+                              field.name === "albumin" ? "4.2" :
+                              field.name === "egfr" ? "90" :
+                              field.name === "rdw" ? "13.0" :
+                              field.name === "uric_acid" ? "5.0" :
+                              field.name === "creatinine" ? "1.1" :
+                              field.name === "tsh" ? "2.5" :
+                              field.name === "ferritin" ? "120" :
+                              field.name === "alt" ? "25" :
+                              field.name === "ast" ? "22" :
+                              field.name === "wbc" ? "6.5" :
+                              field.name === "platelets" ? "250" :
+                              field.name === "nlr" ? "2.1" :
                               "---"
                             }
                             value={form.labs[field.name]}
@@ -437,10 +449,10 @@ const ClinicalAnalysis = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Dna className="text-purple-500" size={22} />
-                  <span className="font-bold">Genomic Integration & 23andMe Connectivity</span>
+                  <span className="font-bold">Genomics (23andMe)</span>
                 </div>
-                <div className="px-2 py-0.5 rounded bg-purple-50 border border-purple-100 text-[8px] font-black text-purple-600 uppercase tracking-tighter animate-pulse">
-                  Currently In Development
+                <div className="px-2 py-0.5 rounded bg-purple-50 border border-purple-100 text-[8px] font-black text-purple-600 uppercase tracking-tighter">
+                  Coming Soon
                 </div>
               </div>
             </h3>

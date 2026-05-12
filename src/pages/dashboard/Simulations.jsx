@@ -343,16 +343,16 @@ const Simulations = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-health-text">QRing Cloud Synchronization — Updating & Optimization In Progress</h3>
-                  <div className="flex items-center gap-1 bg-health-primary/5 px-2 py-0.5 rounded-full border border-health-primary/10">
-                    <span className="w-1.5 h-1.5 bg-health-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    <span className="text-[8px] font-black text-health-primary uppercase tracking-tighter">Active Engine</span>
+                  <h3 className="text-lg font-bold text-health-text">QRing Cloud Synchronization — Under Development</h3>
+                  <div className="flex items-center gap-1 bg-health-surface px-2 py-0.5 rounded-full border border-health-border">
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse" />
+                    <span className="text-[8px] font-black text-health-muted uppercase tracking-tighter">Coming Soon</span>
                   </div>
                 </div>
                 <p className="text-xs text-health-muted mt-0.5">
                   {isSyncing 
-                    ? "Live sync active. Updating & optimizing clinical data streams..." 
-                    : "Connect your wearable to populate simulation data automatically."}
+                    ? "Live sync active. Wearable data cloud integration is currently under development." 
+                    : "Connect your wearable to populate simulation data automatically (Feature in Development)."}
                 </p>
               </div>
             </div>

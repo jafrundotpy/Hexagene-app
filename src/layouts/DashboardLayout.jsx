@@ -42,6 +42,9 @@ const DashboardLayout = () => {
     { id: 9, term: "Cardiovascular Axis", type: "axis", desc: "Biological distribution" },
     { id: 10, term: "Patient: John Doe", type: "patient", desc: "ID: HXG-8821" },
     { id: 11, term: "Patient: Sarah Chen", type: "patient", desc: "ID: HXG-4432" },
+    { id: 12, term: "Simulation Engine", type: "tool", desc: "Run EXA Score" },
+    { id: 13, term: "API Documentation", type: "docs", desc: "Integration specs" },
+    { id: 14, term: "Biometric History", type: "data", desc: "Historical sync" },
   ];
 
   const searchResults = searchQuery.length > 1 
@@ -261,10 +264,10 @@ const DashboardLayout = () => {
                   <div className="h-px bg-health-border my-2 mx-2" />
                   <button 
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"
                   >
-                    <LogOut size={14} />
-                    Sign Out
+                    <LogOut size={16} />
+                    SIGN OUT
                   </button>
                 </div>
               </div>
