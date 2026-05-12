@@ -446,6 +446,7 @@ const ClinicalAnalysis = () => {
 
           {/* GENETICS */}
           <div className="health-card p-8 border-t-4 border-t-purple-500">
+            <h3 className="mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Dna className="text-purple-500" size={22} />
