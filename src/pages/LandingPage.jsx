@@ -21,9 +21,11 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
+import AboutMerlinModal from '../components/AboutMerlinModal';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -48,7 +50,7 @@ const LandingPage = () => {
             <a href="#features" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Features</a>
             <a href="#platform" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Platform</a>
             <a href="#faq" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Technical FAQ</a>
-            <button onClick={() => navigate('/about')} className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">About Merlin</button>
+            <button onClick={() => setIsAboutModalOpen(true)} className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">About Merlin</button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -394,13 +396,19 @@ const LandingPage = () => {
             © 2026 HexaGene Systems. All rights reserved.
           </div>
           <div className="flex gap-6">
-            <button onClick={() => navigate('/about')} className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">About Merlin</button>
+            <button onClick={() => setIsAboutModalOpen(true)} className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">About Merlin</button>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Privacy</a>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Terms</a>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Contact</a>
           </div>
         </div>
       </footer>
+
+      {/* ABOUT MERLIN MODAL */}
+      <AboutMerlinModal 
+        isOpen={isAboutModalOpen} 
+        onClose={() => setIsAboutModalOpen(false)} 
+      />
     </div>
   );
 };
