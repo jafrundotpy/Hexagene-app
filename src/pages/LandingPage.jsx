@@ -36,13 +36,6 @@ const LandingPage = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const scrollToMerlin = () => {
-    const element = document.getElementById('merlin-ecosystem');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-white font-body selection:bg-health-primary/20 overflow-x-hidden">
       
@@ -55,7 +48,6 @@ const LandingPage = () => {
             <a href="#features" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Features</a>
             <a href="#platform" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Platform</a>
             <a href="#faq" className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">Technical FAQ</a>
-            <button onClick={scrollToMerlin} className="text-sm font-bold text-health-muted hover:text-health-primary transition-colors">About Merlin</button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -249,28 +241,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* MERLIN ECOSYSTEM BANNER */}
-      <section id="merlin-ecosystem" className="py-24 bg-[#0a0c10] border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-6 space-y-12">
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-4 text-[10px] font-bold tracking-[0.3em] text-health-primary uppercase">
-              <div className="w-8 h-px bg-health-primary/40" />
-              The Merlin Ecosystem
-              <div className="w-8 h-px bg-health-primary/40" />
-            </div>
-            <h2 className="text-4xl md:text-5xl font-heading font-black text-white">One Legacy. Infinite Innovation.</h2>
-          </div>
-          
-          <div className="rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10">
-            <img 
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-mOn2v0u4N0u4N0u4N0u4N0u4N0u4N.png" 
-              alt="Merlin Ecosystem" 
-              className="w-full h-auto object-cover"
-            />
-          </div>
-        </div>
-      </section>
-
       {/* SECTION: COMMERCIAL DEPLOYMENT / GET IN TOUCH */}
       <section id="deployment" className="py-24 bg-[#0a0c10] text-white">
         <div className="max-w-7xl mx-auto px-6">
@@ -423,7 +393,6 @@ const LandingPage = () => {
             © 2026 HexaGene Systems. All rights reserved.
           </div>
           <div className="flex gap-6">
-            <button onClick={scrollToMerlin} className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">About Merlin</button>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Privacy</a>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Terms</a>
             <a href="#" className="text-[10px] font-bold text-health-muted hover:text-health-primary uppercase tracking-widest">Contact</a>
