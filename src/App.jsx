@@ -7,10 +7,8 @@ import DashboardLayout from './layouts/DashboardLayout';
 // Pages
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
-import ClinicalAnalysis from './pages/dashboard/ClinicalAnalysisPremium';
-import Simulations from './pages/dashboard/SimulationsPremium';
-// import ClinicalAnalysisLegacy from './pages/dashboard/ClinicalAnalysis';
-// import SimulationsLegacy from './pages/dashboard/Simulations';
+import ClinicalAnalysis from './pages/dashboard/ClinicalAnalysis';
+import Simulations from './pages/dashboard/Simulations';
 import ApiAccess from './pages/dashboard/ApiAccess';
 import IntegrationDocs from './pages/dashboard/IntegrationDocs';
 import Usage from './pages/dashboard/Usage';
