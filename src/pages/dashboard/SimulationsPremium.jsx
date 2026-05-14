@@ -50,7 +50,7 @@ const SimulationsPremium = () => {
         body: JSON.stringify({
           user_id: "demo",
           age: parseInt(form.age),
-          sex: parseInt(form.sex),
+          sex: parseInt(form.sex) === 0 ? "M" : "F",
           daily_steps: parseFloat(form.dailySteps),
           resting_heart_rate: parseFloat(form.restingHR),
           avg_sleep_hours: parseFloat(form.sleepDuration),

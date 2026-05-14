@@ -30,14 +30,6 @@ import {
 import { useDropzone } from "react-dropzone";
 import API_URL from "../../api/config";
 
-const DRUG_LIST = [
-  "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
-  "Sertraline", "Fluoxetine", "Paroxetine", "Omeprazole", 
-  "Esomeprazole", "Warfarin", "Clopidogrel", "Lisinopril", 
-  "Amlodipine", "Metoprolol", "Ibuprofen", "Tramadol", 
-  "Codeine", "Levothyroxine"
-];
-
 const LAB_MARKERS = [
   { label: "HbA1c (%)", name: "hba1c", group: "TIER 1: Core Metabolic" },
   { label: "Glucose (mg/dL)", name: "glucose", group: "TIER 1: Core Metabolic" },
@@ -68,7 +60,6 @@ const ClinicalAnalysisPremium = () => {
       ldl: "110", crp: "1.5", wbc: "6.5",
       insulin: "12", ggt: "25", hdl: "55", uric_acid: "5.5"
     },
-    medications: [],
     wearable: {
       hrv: "45", sleep: "7.2", steps: "8000"
     }
@@ -89,13 +80,6 @@ const ClinicalAnalysisPremium = () => {
     });
   };
 
-  const handleMedsChange = (med) => {
-    const newMeds = form.medications.includes(med)
-      ? form.medications.filter(m => m !== med)
-      : [...form.medications, med];
-    setForm({ ...form, medications: newMeds });
-  };
-
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
@@ -105,13 +89,9 @@ const ClinicalAnalysisPremium = () => {
 
       const intakePayload = {
         demographics: { age: parseInt(form.age), sex: parseInt(form.sex) },
-        labs: {
-          ...Object.fromEntries(Object.entries(form.labs).filter(([_, v]) => v !== "").map(([k, v]) => [k, parseFloat(v)])),
-          systolic_bp: parseInt(form.systolic_bp),
-          diastolic_bp: parseInt(form.diastolic_bp)
-        },
-        medications: form.medications || [],
-        raw_23andme: form.raw_23andme
+        labs: Object.fromEntries(Object.entries(form.labs).filter(([_, v]) => v !== "").map(([k, v]) => [k, parseFloat(v)])),
+        medications: [],
+        vitals: { sbp: parseInt(form.systolic_bp), dbp: parseInt(form.diastolic_bp) }
       };
 
       const intakeRes = await fetch(`${API_URL}/v2/intake`, { method: "POST", headers, body: JSON.stringify(intakePayload) });
@@ -255,26 +235,6 @@ const ClinicalAnalysisPremium = () => {
                      <label className="text-[10px] font-bold text-slate-500">Diastolic BP</label>
                      <input value={form.diastolic_bp} onChange={(e) => setForm({...form, diastolic_bp: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-lg p-2 text-sm" />
                    </div>
-                 </div>
-               </div>
-
-               {/* MEDICATIONS */}
-               <div className="space-y-4">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">Medications</p>
-                 <div className="flex flex-wrap gap-2">
-                    {DRUG_LIST.map(drug => (
-                      <button
-                        key={drug}
-                        onClick={() => handleMedsChange(drug)}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${
-                          form.medications.includes(drug)
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100'
-                            : 'bg-white border-slate-200 text-slate-500 hover:border-blue-300'
-                        }`}
-                      >
-                        {drug}
-                      </button>
-                    ))}
                  </div>
                </div>
 
