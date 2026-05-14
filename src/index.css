@@ -89,6 +89,13 @@
 
 .animate-pulse-subtle { animation: pulse-subtle 4s ease-in-out infinite; }
 
+@keyframes health-pulse {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.1); box-shadow: 0 10px 40px -10px rgba(239, 68, 68, 0.2); }
+  50% { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 10px 40px -10px rgba(239, 68, 68, 0.6); }
+}
+
+.animate-health-pulse { animation: health-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
