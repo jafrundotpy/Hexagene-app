@@ -623,12 +623,12 @@ const ClinicalAnalysis = () => {
 
                   <div className="space-y-6">
                     {[
-                      { label: "HRV (ms)",               field: "hrv",        placeholder: "e.g. 55" },
-                      { label: "Resting Heart Rate (bpm)", field: "restingHr",  placeholder: "e.g. 62" },
-                      { label: "CGM Mean Glucose (mg/dL)",field: "cgmGlucose", placeholder: "e.g. 98" },
-                      { label: "Daily Steps",             field: "steps",      placeholder: "e.g. 8000" },
-                      { label: "Sleep Efficiency (%)",    field: "sleep",      placeholder: "e.g. 88" },
-                      { label: "SpO2 (%)",                field: "spo2",       placeholder: "e.g. 97" }
+                      { label: "HRV (ms)", field: "hrv" },
+                      { label: "Resting Heart Rate (bpm)", field: "restingHr" },
+                      { label: "CGM Mean Glucose (mg/dL)", field: "cgmGlucose" },
+                      { label: "Daily Steps", field: "steps" },
+                      { label: "Sleep (hours)", field: "sleep" },
+                      { label: "SpO2 (%)", field: "spo2" }
                     ].map((metric) => (
                       <div key={metric.field}>
                         <p className="text-[10px] font-black text-health-muted uppercase tracking-widest mb-2">{metric.label}</p>
@@ -639,7 +639,6 @@ const ClinicalAnalysis = () => {
                               <input 
                                 type="number" 
                                 className="input-health w-full text-center px-1 text-xs py-1.5"
-                                placeholder={metric.placeholder}
                                 value={wearableData[metric.field][day]}
                                 onChange={e => updateWearableField(metric.field, day, e.target.value)}
                               />
@@ -651,12 +650,11 @@ const ClinicalAnalysis = () => {
                   </div>
                 </div>
 
-                <div className="bg-amber-50 rounded-lg p-4 flex items-start gap-2 border border-amber-100 space-y-1">
-                  <span className="text-amber-500 mt-0.5">💡</span>
-                  <div className="text-[11px] text-amber-700 leading-relaxed space-y-1.5">
-                    <p><strong>Sleep Efficiency</strong> is a <strong>percentage (0–100%)</strong>, not hours. Typical healthy values: <strong>85–95%</strong>. Enter <code className="bg-amber-100 px-1 rounded">88</code>, not <code className="bg-amber-100 px-1 rounded">8.8</code>.</p>
-                    <p><strong>Tip:</strong> For best results, provide at least 5–7 days of HRV and CGM data. The engine requires at least one valid stream to generate the Vitals projection.</p>
-                  </div>
+                <div className="bg-amber-50 rounded-lg p-3 flex items-start gap-2 border border-amber-100">
+                  <span className="text-amber-500">💡</span>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    <strong>Tip:</strong> For best results, provide at least 7 days of HRV and CGM data. The backend engine requires a minimum of one valid stream to generate the Vitals projection.
+                  </p>
                 </div>
               </div>
             )}
