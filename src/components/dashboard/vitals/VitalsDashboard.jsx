@@ -43,17 +43,10 @@ const VitalsDashboard = ({ vitals }) => {
     layer1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
-  console.log("[DEBUG] VitalsDashboard - vitals block received:", vitals);
-
-  if (!vitals) {
-    console.log("[DEBUG] VitalsDashboard - vitals block is missing, rendering empty state.");
-    return <VitalsEmptyState />;
-  }
+  if (!vitals) return <VitalsEmptyState />;
 
   const hasTrajectory  = (vitals.trajectory?.points?.length ?? 0) > 1;
   const hasRecommendations = (vitals.recommendations?.length ?? 0) > 0;
-
-  console.log("[DEBUG] VitalsDashboard - render conditions:", { hasTrajectory, hasRecommendations });
 
   return (
     /*

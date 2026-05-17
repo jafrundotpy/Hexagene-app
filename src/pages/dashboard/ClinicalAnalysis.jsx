@@ -306,9 +306,6 @@ const ClinicalAnalysis = () => {
         }
       }
 
-      console.log("[DEBUG] Final outgoing /v2/score payload:", scorePayload);
-      console.log("[DEBUG] Presence of payload.vitals:", scorePayload.vitals ? "YES" : "NO");
-
       const scoreRes = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
         headers,
@@ -326,9 +323,6 @@ const ClinicalAnalysis = () => {
       });
       if (!reportRes.ok) throw new Error("Report generation failed");
       const finalReport = await reportRes.json();
-
-      console.log("[DEBUG] Final backend response:", finalReport);
-      console.log("[DEBUG] Presence of response.vitals:", finalReport.vitals ? "YES" : "NO");
 
       const t1 = performance.now();
       setResults(finalReport);
