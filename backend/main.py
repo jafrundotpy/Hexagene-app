@@ -555,8 +555,11 @@ async def analyze(request: AnalysisRequest, key_data=Depends(verify_api_key)):
     try:
         from engine_demo import patient_report
         from clinical_report_demo import generate_clinical_report
+        from vitals_demo import vitals_projection, merge_vitals_into_report
         
         raw_report = patient_report(data)
+        # Additive fourth projection: wearable / longitudinal vitals
+        raw_report = merge_vitals_into_report(raw_report, data.get("vitals"))
         # Enrich with clinical analysis (Boss requirement: all 8 outputs)
         report = generate_clinical_report(raw_report)
         _increment_usage(key_data)
@@ -585,8 +588,11 @@ async def v2_score(payload: Union[AnalysisRequest, PatientInput], key_data=Depen
     try:
         from engine_demo import patient_report
         from clinical_report_demo import generate_clinical_report
+        from vitals_demo import vitals_projection, merge_vitals_into_report
         
         raw_report = patient_report(body)
+        # Additive fourth projection: wearable / longitudinal vitals
+        raw_report = merge_vitals_into_report(raw_report, body.get("vitals"))
         # Enrich with clinical analysis (Boss requirement: all 8 outputs)
         report = generate_clinical_report(raw_report)
     except Exception:

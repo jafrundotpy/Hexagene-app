@@ -32,6 +32,7 @@ class PatientInput(BaseModel):
     blood: Optional[dict[str, float]] = None
     medications: Optional[list[str]] = None
     variants: Optional[list[Union[str, VariantObject]]] = None
+    vitals: Optional[dict[str, Any]] = None
 
     @field_validator("blood")
     @classmethod

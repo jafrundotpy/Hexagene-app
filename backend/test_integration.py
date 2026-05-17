@@ -75,7 +75,31 @@ def run_tests():
         assert r.status_code == 200, f"Wearable Score failed: {r.text}"
         print("[PASS] /v2/score-from-wearable")
 
-    print("\n✅ All Boss backend integration tests passed successfully!")
+    # 9. Vitals Stream Scoring
+    print("Testing /v2/score with Wearable Vitals block...")
+    vitals_patient_payload = dict(patient_payload)
+    vitals_patient_payload["vitals"] = {
+        "window_days": 21,
+        "streams": {
+            "hrv": [48.0, 45.0, 42.0, 40.0],
+            "sleep_efficiency": [91.0, 88.0, 82.0, 79.0],
+            "cgm_mean_glucose": [110.0, 118.0, 126.0]
+        }
+    }
+    r = client.post("/v2/score", json=vitals_patient_payload, headers=HEADERS)
+    assert r.status_code == 200, f"Score with vitals failed: {r.text}"
+    vitals_res = r.json()
+    assert "vitals" in vitals_res, "Vitals block missing in score response"
+    vitals_block = vitals_res["vitals"]
+    assert vitals_block is not None, "Vitals block should not be None"
+    assert "axis_contributions" in vitals_block, "Missing axis_contributions in vitals block"
+    assert "trajectory" in vitals_block, "Missing trajectory in vitals block"
+    assert "stability" in vitals_block, "Missing stability in vitals block"
+    assert "loop_attribution" in vitals_block, "Missing loop_attribution in vitals block"
+    assert "recommendations" in vitals_block, "Missing recommendations in vitals block"
+    print("[PASS] /v2/score with Wearable Vitals block")
+
+    print("\n[SUCCESS] All Boss backend integration tests passed successfully!")
     print("Schema compatibility verified. Frontend payloads will not break.")
 
 if __name__ == "__main__":

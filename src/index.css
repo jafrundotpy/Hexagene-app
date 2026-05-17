@@ -3,14 +3,20 @@
 @tailwind utilities;
 
 :root {
-  /* Design Tokens */
-  --health-white: #FFFFFF;
-  --health-bg: #F9FAFB;
+  --health-white:   #FFFFFF;
+  --health-bg:      #F9FAFB;
   --health-primary: #22C55E;
-  --health-secondary: #F97316;
-  --health-text: #111827;
-  --health-muted: #6B7280;
-  --health-border: #E5E7EB;
+  --health-secondary:#F97316;
+  --health-text:    #111827;
+  --health-muted:   #6B7280;
+  --health-border:  #E5E7EB;
+  /* Wearable tokens */
+  --vitals-warm:      #f7f4ee;
+  --vitals-parchment: #f0e6d4;
+  --vitals-drift:     #b07433;
+  --vitals-steady:    #5f7d63;
+  --vitals-dark:      #1a1a2e;
+  --vitals-border:    #c2b89f;
 }
 
 @layer base {
@@ -21,88 +27,139 @@
 }
 
 @layer components {
-  /* Clean Health Card */
+  /* ─── Clinical UI ──────────────────────────── */
   .health-card {
     @apply bg-white border border-health-border rounded-2xl shadow-health;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-
   .health-card-hover:hover {
     @apply shadow-health-lg border-health-primary/20;
     transform: translateY(-2px);
   }
-
-  /* Typography Gradient (Subtle) */
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-health-primary to-emerald-600;
   }
-
-  /* Primary Button */
   .btn-health-primary {
     @apply px-6 py-3 rounded-xl font-bold transition-all duration-200 bg-health-primary text-white border-none cursor-pointer flex items-center justify-center gap-2;
-    box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.2);
+    box-shadow: 0 4px 6px -1px rgba(34,197,94,0.2);
   }
-  .btn-health-primary:hover {
-    @apply brightness-110 shadow-lg;
-    transform: translateY(-1px);
-  }
+  .btn-health-primary:hover { @apply brightness-110 shadow-lg; transform: translateY(-1px); }
   .btn-health-primary:active { @apply scale-95; }
-
-  /* Secondary Button */
   .btn-health-secondary {
     @apply px-6 py-3 rounded-xl font-bold transition-all duration-200 bg-health-secondary text-white border-none cursor-pointer flex items-center justify-center gap-2;
-    box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.2);
+    box-shadow: 0 4px 6px -1px rgba(249,115,22,0.2);
   }
-  .btn-health-secondary:hover {
-    @apply brightness-110 shadow-lg;
-    transform: translateY(-1px);
-  }
-
-  /* Outline Button */
+  .btn-health-secondary:hover { @apply brightness-110 shadow-lg; transform: translateY(-1px); }
   .btn-health-outline {
     @apply px-6 py-3 rounded-xl font-bold border border-health-border text-health-text bg-white transition-all duration-200 hover:bg-health-bg hover:border-health-muted/30;
   }
-
-  /* Input Styling */
   .input-health {
     @apply bg-white border border-health-border rounded-xl px-4 py-3 text-sm text-health-text placeholder:text-health-muted/50 focus:outline-none focus:border-health-primary focus:ring-4 focus:ring-health-primary/10 transition-all;
   }
-
-  /* Sidebar Styling */
   .sidebar-link {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all;
   }
+
+  /* ─── Wearable Vitals Surface ───────────────── */
+  .wearable-card {
+    background: #f9f8f6;
+    @apply border border-slate-200/60 rounded-[2rem];
+    box-shadow: 0 2px 16px -4px rgba(176,116,51,0.10);
+    transition: box-shadow 0.4s ease;
+  }
+  .wearable-card:hover {
+    box-shadow: 0 4px 28px -4px rgba(176,116,51,0.16);
+  }
+  .vitals-chip-drift {
+    @apply inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold;
+    background: #f0e6d4; color: #b07433;
+  }
+  .vitals-chip-steady {
+    @apply inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold;
+    background: #e4ebe2; color: #5f7d63;
+  }
+  .vitals-badge-drift {
+    @apply text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg;
+    color: #b07433; background: #f0e6d4;
+  }
+  .vitals-badge-steady {
+    @apply text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg;
+    color: #5f7d63; background: #e4ebe2;
+  }
+
+  /* Result Tabs */
+  .result-tab {
+    @apply relative px-5 py-3 text-[11px] font-black uppercase tracking-widest transition-colors duration-200 whitespace-nowrap;
+    color: #9ca3af;
+  }
+  .result-tab:hover { color: #374151; }
+  .result-tab.active { color: #b07433; }
+  .result-tab.active::after {
+    content: '';
+    @apply absolute bottom-0 left-3 right-3 h-0.5 rounded-full;
+    background: #b07433;
+  }
+  .result-tab-vitals.active { color: #5f7d63; }
+  .result-tab-vitals.active::after { background: #5f7d63; }
 }
 
-/* Animations */
+/* ─── Animations ────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
 
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; }
+  50%       { opacity: 0.8; }
 }
-
 .animate-pulse-subtle { animation: pulse-subtle 4s ease-in-out infinite; }
 
 @keyframes health-pulse {
-  0%, 100% { border-color: rgba(239, 68, 68, 0.1); box-shadow: 0 10px 40px -10px rgba(239, 68, 68, 0.2); }
-  50% { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 10px 40px -10px rgba(239, 68, 68, 0.6); }
+  0%, 100% { border-color: rgba(239,68,68,0.1); box-shadow: 0 10px 40px -10px rgba(239,68,68,0.2); }
+  50%       { border-color: rgba(239,68,68,0.5); box-shadow: 0 10px 40px -10px rgba(239,68,68,0.6); }
 }
+.animate-health-pulse { animation: health-pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
 
-.animate-health-pulse { animation: health-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes breath {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%       { transform: scale(1.02); opacity: 0.93; }
+}
+.animate-breath { animation: breath 4s ease-in-out infinite; }
+
+@keyframes drift-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(176,116,51,0); }
+  50%       { box-shadow: 0 0 24px 6px rgba(176,116,51,0.14); }
+}
+.animate-drift-glow { animation: drift-glow 3s ease-in-out infinite; }
+
+@keyframes ring-pulse-amber {
+  0%, 100% { filter: drop-shadow(0 0 0px rgba(176,116,51,0)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(176,116,51,0.32)); }
+}
+.animate-ring-pulse { animation: ring-pulse-amber 2.8s ease-in-out infinite; }
 
 /* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  @apply bg-health-bg;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-health-border rounded-full hover:bg-health-muted/30;
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { @apply bg-health-bg; }
+::-webkit-scrollbar-thumb { @apply bg-health-border rounded-full hover:bg-health-muted/30; }
+
+/* ─── Accessibility: Reduced Motion ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-breath,
+  .animate-drift-glow,
+  .animate-ring-pulse,
+  .animate-slide-up,
+  .animate-fade-in,
+  .animate-health-pulse,
+  .animate-pulse-subtle,
+  .animate-bounce,
+  .animate-ping { animation: none !important; transition: none !important; }
 }

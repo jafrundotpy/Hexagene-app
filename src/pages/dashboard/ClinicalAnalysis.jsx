@@ -23,6 +23,8 @@ import {
   Layers,
   ArrowRight,
   ChevronDown,
+  Smartphone,
+  Link,
   ChevronUp,
   CheckCircle2,
   XCircle,
@@ -40,6 +42,7 @@ import {
 import API_URL from "../../api/config";
 import MetricCard from "../../components/dashboard/MetricCard";
 import UserFriendlySummary from "../../components/dashboard/UserFriendlySummary";
+import VitalsDashboard from "../../components/dashboard/vitals/VitalsDashboard";
 
 const DRUG_LIST = [
   "Metformin", "Atorvastatin", "Simvastatin", "Rosuvastatin", 
@@ -101,6 +104,39 @@ const ClinicalAnalysis = () => {
     medications: [],
     raw_23andme: ""
   });
+
+  const [wearableData, setWearableData] = useState({
+    windowDays: 21,
+    hrv: ['', '', '', '', '', '', ''],
+    restingHr: ['', '', '', '', '', '', ''],
+    cgmGlucose: ['', '', '', '', '', '', ''],
+    steps: ['', '', '', '', '', '', ''],
+    sleep: ['', '', '', '', '', '', ''],
+    spo2: ['', '', '', '', '', '', '']
+  });
+  const [showWearable, setShowWearable] = useState(true);
+
+  const updateWearableField = (field, index, value) => {
+    setWearableData(prev => ({
+      ...prev,
+      [field]: prev[field].map((v, i) => i === index ? value : v)
+    }));
+  };
+
+  const hasWearableData = () => {
+    if (!wearableData) return false;
+    const streams = [
+      wearableData.hrv,
+      wearableData.restingHr,
+      wearableData.cgmGlucose,
+      wearableData.steps,
+      wearableData.sleep,
+      wearableData.spo2
+    ];
+    return streams.some(stream => 
+      Array.isArray(stream) && stream.some(v => v !== undefined && v !== null && String(v).trim() !== "")
+    );
+  };
 
   const resultsRef = useRef(null);
 
@@ -224,10 +260,59 @@ const ClinicalAnalysis = () => {
 
       // 2. Score
       currentStep = "Scoring";
+      
+      const scorePayload = {
+        ...intakeData.patient
+      };
+
+      if (hasWearableData()) {
+        const cleanStream = (arr) => {
+          if (!Array.isArray(arr)) return [];
+          return arr
+            .map(v => (v === undefined || v === null || String(v).trim() === "") ? null : Number(v))
+            .filter(v => v !== null && !isNaN(v));
+        };
+
+        const streams = {};
+        const hrvCleaned = cleanStream(wearableData.hrv);
+        const restingHrCleaned = cleanStream(wearableData.restingHr);
+        const cgmCleaned = cleanStream(wearableData.cgmGlucose);
+        const stepsCleaned = cleanStream(wearableData.steps);
+        const sleepCleaned = cleanStream(wearableData.sleep);
+        const spo2Cleaned = cleanStream(wearableData.spo2);
+
+        if (hrvCleaned.length > 0) streams.hrv = hrvCleaned;
+        if (restingHrCleaned.length > 0) {
+          streams.resting_hr = restingHrCleaned;
+          streams.resting_heart_rate = restingHrCleaned;
+        }
+        if (cgmCleaned.length > 0) streams.cgm_mean_glucose = cgmCleaned;
+        if (stepsCleaned.length > 0) {
+          streams.steps = stepsCleaned;
+          streams.daily_steps = stepsCleaned;
+        }
+        if (sleepCleaned.length > 0) {
+          streams.sleep_efficiency = sleepCleaned;
+          streams.sleep_hours = sleepCleaned;
+          streams.sleep = sleepCleaned;
+        }
+        if (spo2Cleaned.length > 0) streams.spo2 = spo2Cleaned;
+
+        if (Object.keys(streams).length > 0) {
+          scorePayload.vitals = {
+            window_days: parseInt(wearableData.windowDays) || 21,
+            streams: streams
+          };
+        }
+      }
+
+      console.log("[DEBUG] Final outgoing /v2/score payload:", scorePayload);
+      console.log("[DEBUG] Presence of payload.vitals:", scorePayload.vitals ? "YES" : "NO");
+
       const scoreRes = await fetch(`${API_URL}/v2/score`, {
         method: "POST",
         headers,
-        body: JSON.stringify(intakeData.patient)
+        body: JSON.stringify(scorePayload)
       });
       if (!scoreRes.ok) throw new Error("Scoring failed");
       const scoreData = await scoreRes.json();
@@ -242,10 +327,14 @@ const ClinicalAnalysis = () => {
       if (!reportRes.ok) throw new Error("Report generation failed");
       const finalReport = await reportRes.json();
 
+      console.log("[DEBUG] Final backend response:", finalReport);
+      console.log("[DEBUG] Presence of response.vitals:", finalReport.vitals ? "YES" : "NO");
+
       const t1 = performance.now();
       setResults(finalReport);
       setDebugData(prev => ({
         ...prev,
+        request: scorePayload,
         response: finalReport,
         endpoint: `${API_URL}/v2/report (Multi-step flow)`,
         latency: Math.round(t1 - t0)
@@ -259,6 +348,7 @@ const ClinicalAnalysis = () => {
   };
 
   const [expandedVariant, setExpandedVariant] = useState(null);
+  const [activeResultTab, setActiveResultTab] = useState('position');
 
   const renderAxisBar = (label, value) => {
     const percent = Math.round(value * 100);
@@ -490,14 +580,102 @@ const ClinicalAnalysis = () => {
             </div>
           </div>
 
+          {/* WEARABLE DATA (VITALS) */}
+          <div className="health-card p-8 border-t-4 border-t-blue-400">
+            <h3 
+              className="mb-4 cursor-pointer group flex items-center justify-between"
+              onClick={() => setShowWearable(!showWearable)}
+            >
+              <div className="flex items-center gap-3">
+                <Smartphone className="text-blue-500" size={22} />
+                <span className="font-bold group-hover:text-blue-600 transition-colors">Wearable Data (Vitals)</span>
+              </div>
+              <div className="text-slate-400 group-hover:text-blue-500 transition-colors">
+                {showWearable ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+              </div>
+            </h3>
+
+            {showWearable && (
+              <div className="space-y-6 animate-fade-in pt-2">
+                
+                <div className="flex items-center gap-4">
+                  <label className="text-[10px] font-black text-health-muted uppercase tracking-widest min-w-[80px]">
+                    Time Window:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      className="input-health w-20 text-center font-bold" 
+                      value={wearableData.windowDays}
+                      onChange={e => setWearableData(prev => ({...prev, windowDays: e.target.value}))}
+                    />
+                    <span className="text-[11px] text-slate-400">days (7-90 days recommended)</span>
+                  </div>
+                </div>
+
+                <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Link size={14} className="text-blue-500" />
+                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-widest">Quick Connect (Optional)</span>
+                  </div>
+                  <button className="w-full py-2 bg-white border border-blue-200 text-blue-600 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-50 transition-colors mb-2">
+                    Connect Bridge App
+                  </button>
+                  <p className="text-[10px] text-slate-500 text-center">Status: ○ Disconnected</p>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl p-5 bg-white">
+                  <div className="mb-6">
+                    <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-widest">Manual Entry (7-day window)</h4>
+                  </div>
+
+                  <div className="space-y-6">
+                    {[
+                      { label: "HRV (ms)", field: "hrv" },
+                      { label: "Resting Heart Rate (bpm)", field: "restingHr" },
+                      { label: "CGM Mean Glucose (mg/dL)", field: "cgmGlucose" },
+                      { label: "Daily Steps", field: "steps" },
+                      { label: "Sleep (hours)", field: "sleep" },
+                      { label: "SpO2 (%)", field: "spo2" }
+                    ].map((metric) => (
+                      <div key={metric.field}>
+                        <p className="text-[10px] font-black text-health-muted uppercase tracking-widest mb-2">{metric.label}</p>
+                        <div className="grid grid-cols-7 gap-1">
+                          {[0, 1, 2, 3, 4, 5, 6].map(day => (
+                            <div key={day} className="flex flex-col items-center">
+                              <span className="text-[8px] text-slate-400 mb-1">D{day+1}</span>
+                              <input 
+                                type="number" 
+                                className="input-health w-full text-center px-1 text-xs py-1.5"
+                                value={wearableData[metric.field][day]}
+                                onChange={e => updateWearableField(metric.field, day, e.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 rounded-lg p-3 flex items-start gap-2 border border-amber-100">
+                  <span className="text-amber-500">💡</span>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    <strong>Tip:</strong> For best results, provide at least 7 days of HRV and CGM data. The backend engine requires a minimum of one valid stream to generate the Vitals projection.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* RESULTS PANEL */}
         <div ref={resultsRef} className="xl:col-span-8">
           {results ? (
-            <div className="space-y-10 animate-fade-in">
-              
-              {/* 0. EXECUTIVE SUMMARY & COVERAGE STRIP */}
+            <div className="space-y-6 animate-fade-in">
+
+              {/* ── EXECUTIVE SUMMARY ─────────────────────────────────── */}
               <div className="space-y-6">
                 <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden group border border-white/5">
                   <div className="absolute top-0 right-0 w-96 h-96 bg-health-primary/10 blur-[120px] -mr-32 -mt-32 group-hover:bg-health-primary/20 transition-all duration-1000" />
@@ -550,6 +728,31 @@ const ClinicalAnalysis = () => {
                   </div>
                 </div>
               </div>
+
+              {/* ── RESULT TABS ─────────────────────────────────────────── */}
+              <div className="border-b border-slate-100 flex overflow-x-auto gap-1 -mb-px">
+                {[
+                  { id: 'position', label: 'Position' },
+                  { id: 'terrain',  label: 'Terrain'  },
+                  { id: 'forces',   label: 'Forces'   },
+                  { id: 'vitals',   label: 'Vitals'   },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    id={`result-tab-${tab.id}`}
+                    onClick={() => setActiveResultTab(tab.id)}
+                    role="tab"
+                    aria-selected={activeResultTab === tab.id}
+                    className={`result-tab${tab.id === 'vitals' ? ' result-tab-vitals' : ''}${activeResultTab === tab.id ? ' active' : ''}`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── POSITION TAB ────────────────────────────────────────── */}
+              {activeResultTab === 'position' && (
+              <div className="space-y-8 animate-fade-in">
 
               {/* 1. POSITION SCORE & CLASSIFICATION */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -792,8 +995,14 @@ const ClinicalAnalysis = () => {
                 })}
               </div>
 
-              {/* 3. TERRAIN VARIANTS WITH TISSUE GROUPING */}
-              {results.terrain && results.terrain.variants && results.terrain.variants.length > 0 && (
+              </div>)}
+
+              {/* ── TERRAIN TAB ─────────────────────────────────────────── */}
+              {activeResultTab === 'terrain' && (
+              <div className="space-y-8 animate-fade-in">
+
+              {/* TERRAIN VARIANTS WITH TISSUE GROUPING */}
+              {results.terrain && results.terrain.variants && results.terrain.variants.length > 0 ? (
                 <div className="health-card overflow-hidden">
                   <div className="p-10 border-b border-health-border flex items-center justify-between bg-health-surface/30">
                     <div className="flex items-center gap-3">
@@ -902,9 +1111,16 @@ const ClinicalAnalysis = () => {
                     </table>
                   </div>
                 </div>
+              ) : (
+                <div className="health-card p-12 text-center text-health-muted">No terrain data available.</div>
               )}
+              </div>)}
 
-              {/* 4. FORCES (Flags & Interaction Network) */}
+              {/* ── FORCES TAB ──────────────────────────────────────────── */}
+              {activeResultTab === 'forces' && (
+              <div className="space-y-8 animate-fade-in">
+
+              {/* FORCES — Flags & Interaction Network */}
               {(results.forces?.flags?.length > 0 || results.forces?.interactions?.length > 0) && (
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                   <div className="xl:col-span-4 health-card p-10 space-y-8">
@@ -981,8 +1197,11 @@ const ClinicalAnalysis = () => {
                   </div>
                 </div>
               )}
+              </div>)}
 
-              {/* 6 & 7. INTEGRATION & ACTION ITEMS */}
+              {/* ── INTEGRATION & ACTIONS — shown on Position / Terrain / Forces tabs ── */}
+              {activeResultTab !== 'vitals' && (
+              <div className="space-y-8 animate-fade-in">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* INTEGRATION */}
                 <div className="health-card p-8 space-y-6">
@@ -1051,6 +1270,14 @@ const ClinicalAnalysis = () => {
                   </div>
                 </div>
               </div>
+              </div>)}
+
+              {/* ── VITALS TAB ──────────────────────────────────────────── */}
+              {activeResultTab === 'vitals' && (
+              <div className="py-4 animate-fade-in">
+                <VitalsDashboard vitals={results.vitals} />
+              </div>
+              )}
 
             </div>
           ) : (
