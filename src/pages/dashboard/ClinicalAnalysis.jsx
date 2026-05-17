@@ -314,23 +314,21 @@ const ClinicalAnalysis = () => {
       if (!scoreRes.ok) throw new Error("Scoring failed");
       const scoreData = await scoreRes.json();
 
-      // 3. Report
-      currentStep = "Reporting";
-      const reportRes = await fetch(`${API_URL}/v2/report`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(scoreData)
-      });
-      if (!reportRes.ok) throw new Error("Report generation failed");
-      const finalReport = await reportRes.json();
+      // /v2/score already returns the fully-enriched report:
+      // position + terrain + forces + vitals + clinical — no extra /v2/report call needed.
+      const finalReport = scoreData;
 
       const t1 = performance.now();
       setResults(finalReport);
+      // Auto-switch to Vitals tab when the backend returned vitals data
+      if (finalReport.vitals) {
+        setActiveResultTab('vitals');
+      }
       setDebugData(prev => ({
         ...prev,
         request: scorePayload,
         response: finalReport,
-        endpoint: `${API_URL}/v2/report (Multi-step flow)`,
+        endpoint: `${API_URL}/v2/score`,
         latency: Math.round(t1 - t0)
       }));
     } catch (err) {
@@ -704,6 +702,16 @@ const ClinicalAnalysis = () => {
                           <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-slate-900 transition-colors">{p}</span>
                         </div>
                       ))}
+                      {/* Vitals projection — shown when backend returned vitals block */}
+                      {results.vitals && (
+                        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setActiveResultTab('vitals')}>
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center transition-all" style={{ background: '#e4ebe2' }}>
+                            <CheckCircle2 size={12} style={{ color: '#5f7d63' }} />
+                          </div>
+                          <span className="text-[10px] font-black uppercase transition-colors" style={{ color: '#5f7d63' }}>vitals</span>
+                          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#5f7d63' }} />
+                        </div>
+                      )}
                       {results.clinical.coverage.missing_projections.map(p => (
                         <div key={p} className="flex items-center gap-2 opacity-40">
                           <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
@@ -737,9 +745,16 @@ const ClinicalAnalysis = () => {
                     onClick={() => setActiveResultTab(tab.id)}
                     role="tab"
                     aria-selected={activeResultTab === tab.id}
-                    className={`result-tab${tab.id === 'vitals' ? ' result-tab-vitals' : ''}${activeResultTab === tab.id ? ' active' : ''}`}
+                    className={`result-tab${tab.id === 'vitals' ? ' result-tab-vitals' : ''}${activeResultTab === tab.id ? ' active' : ''} flex items-center gap-1.5`}
                   >
                     {tab.label}
+                    {tab.id === 'vitals' && results.vitals && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
+                        style={{ background: '#5f7d63' }}
+                        title="Wearable vitals projection available"
+                      />
+                    )}
                   </button>
                 ))}
               </div>
